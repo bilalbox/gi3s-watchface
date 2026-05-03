@@ -1,0 +1,7 @@
+name = "My Watch Face"
+version = "1.0.0"
+deviceType = "Instinct3Solar45mm"
+languages = ["en"]
+
+# Point to your manifest file
+project.manifest = "manifest.xml"

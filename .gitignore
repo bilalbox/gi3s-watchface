@@ -1,0 +1,33 @@
+# --- Garmin Connect IQ / Monkey C (never commit build outputs) ---
+bin/
+gen/
+internal-mir/
+external-mir/
+mir/
+
+# Compiled app and debug symbols (SDK output; may appear in repo root or bin/)
+*.prg
+*.prg.debug.xml
+*.iq
+
+# --- Signing keys (treat like secrets on a public repo) ---
+developer_key*
+
+# --- Simulator / IDE plugin droppings (paths, last run, local prefs) ---
+*-settings.json
+
+# --- OS and editors ---
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.log
+.idea/
+*.suo
+*.user
+*.tmp
+*.swp
+*~
+
+# --- Optional local env (if you add scripts later) ---
+.env
+.env.*

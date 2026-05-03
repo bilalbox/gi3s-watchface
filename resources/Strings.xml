@@ -1,0 +1,18 @@
+<resources xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://developer.garmin.com/downloads/connect-iq/resources.xsd">
+  <properties>
+    <property id="hijriDayOffset" type="number">0</property>
+  </properties>
+
+  <strings>
+    <string id="AppName">My Watch Face</string>
+    <string id="hijri_offset_title">Hijri date adjustment</string>
+    <string id="hijri_offset_prompt">Days to shift the tabular Hijri date for local moon sighting (from -2 to +2).</string>
+    <string id="hijri_offset_error">Enter a whole number from -2 to 2.</string>
+  </strings>
+
+  <settings>
+    <setting propertyKey="@Properties.hijriDayOffset" title="@Strings.hijri_offset_title" prompt="@Strings.hijri_offset_prompt">
+      <settingConfig type="numeric" min="-2" max="2" errorMessage="@Strings.hijri_offset_error" />
+    </setting>
+  </settings>
+</resources>
