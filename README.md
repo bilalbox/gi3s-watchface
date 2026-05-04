@@ -8,8 +8,8 @@ A data-heavy Connect IQ watch face designed for the **Garmin Instinct 3 Solar 45
 
 ### Date Display
 
-- **Gregorian date**: Weekday (3-letter abbreviation), day, and 3-letter month (e.g., `SUN 26 APR`)
 - **Hijri date**: Day, 3-letter month abbreviation, and 2-digit year (e.g., `26 SHA 29`)
+- **Gregorian date**: Weekday (2-letter abbreviation), day, and 3-letter month (e.g., `SU 26 APR`)
 - **Hijri adjustment**: Configurable ±2 day offset to align tabular Hijri calculations with local moon sighting
 
 ### Time Display

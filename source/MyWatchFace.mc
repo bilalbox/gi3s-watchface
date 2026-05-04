@@ -74,13 +74,13 @@ module HijriHelpers {
 
     function weekdayAbbr(dayOfWeek as Number) as String {
         switch (dayOfWeek) {
-            case 1: return "SUN";
-            case 2: return "MON";
-            case 3: return "TUE";
-            case 4: return "WED";
-            case 5: return "THU";
-            case 6: return "FRI";
-            case 7: return "SAT";
+            case 1: return "SU";
+            case 2: return "MO";
+            case 3: return "TU";
+            case 4: return "WE";
+            case 5: return "TH";
+            case 6: return "FR";
+            case 7: return "SA";
             default: return "";
         }
     }
@@ -500,8 +500,8 @@ class MyWatchFace extends WatchUi.WatchFace {
                         hYear;
 
         dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(22, 8,  Graphics.FONT_XTINY, gregorianLine, Graphics.TEXT_JUSTIFY_LEFT);
-        dc.drawText(22, 24, Graphics.FONT_XTINY, hijriLine,     Graphics.TEXT_JUSTIFY_LEFT);
+        dc.drawText(22, 8, Graphics.FONT_XTINY, hijriLine,     Graphics.TEXT_JUSTIFY_LEFT);
+        dc.drawText(22, 24,  Graphics.FONT_XTINY, gregorianLine, Graphics.TEXT_JUSTIFY_LEFT);
     }
 
     // -------------------------------------------------------------------------
