@@ -74,13 +74,13 @@ module HijriHelpers {
 
     function weekdayAbbr(dayOfWeek as Number) as String {
         switch (dayOfWeek) {
-            case 1: return "SU";
-            case 2: return "MO";
-            case 3: return "TU";
-            case 4: return "WE";
-            case 5: return "TH";
-            case 6: return "FR";
-            case 7: return "SA";
+            case 1: return "SUN";
+            case 2: return "MON";
+            case 3: return "TUE";
+            case 4: return "WED";
+            case 5: return "THU";
+            case 6: return "FRI";
+            case 7: return "SAT";
             default: return "";
         }
     }
@@ -111,7 +111,18 @@ module TimeHelpers {
             clockTime.min.format("%02d")
         ]);
     }
+
+    // Formats a Unix-epoch seconds value as HH:MM in 24h time
+    function formatEventTime(epochSec as Number) as String {
+        var t   = new Time.Moment(epochSec);
+        var info = Gregorian.info(t, Time.FORMAT_SHORT);
+        return Lang.format("$1$:$2$", [
+            info.hour.format("%02d"),
+            info.min.format("%02d")
+        ]);
+    }
 }
+
 
 class HijriOffsetSettingsMenu extends WatchUi.Menu2 {
     function initialize() {
@@ -179,19 +190,17 @@ class MyWatchFace extends WatchUi.WatchFace {
     var cachedDistanceCm    = 0.0;
     var cachedCalories      = 0;
     var cachedFloorsClimbed = 0;
+    var cachedMoveBarLevel  = 0;
 
     // Date
     var cachedGregorianInfo = null;
 
-    // Porthole geometry (unchanged from original HR arc)
+    // Porthole geometry
     const PORTHOLE_CX = 143;
     const PORTHOLE_CY = 32;
     const PORTHOLE_R  = 30;
 
-    // -------------------------------------------------------------------------
     // Lifecycle
-    // -------------------------------------------------------------------------
-
     function initialize() {
         WatchFace.initialize();
         timer = new Timer.Timer();
@@ -219,10 +228,7 @@ class MyWatchFace extends WatchUi.WatchFace {
         WatchUi.requestUpdate();
     }
 
-    // -------------------------------------------------------------------------
     // Tick
-    // -------------------------------------------------------------------------
-
     function onMinuteUiTick() as Void {
         cachedGregorianInfo = Gregorian.info(Time.now(), Time.FORMAT_SHORT);
 
@@ -254,13 +260,11 @@ class MyWatchFace extends WatchUi.WatchFace {
         drawSolarPorthole(dc);
     }
 
-    // -------------------------------------------------------------------------
     // Data helpers
-    // -------------------------------------------------------------------------
-
     function updateActivityData() {
         var info = ActivityMonitor.getInfo();
         if (info != null) {
+            if (info.moveBarLevel != null) { cachedMoveBarLevel = info.moveBarLevel; }
             if (info.steps        != null) { cachedSteps        = info.steps; }
             if (info.distance     != null) { cachedDistanceCm   = info.distance; }
             if (info.calories     != null) { cachedCalories     = info.calories; }
@@ -322,35 +326,9 @@ class MyWatchFace extends WatchUi.WatchFace {
         cachedHrDisplay = HEART_RATE_PLACEHOLDER;
     }
 
-    // -------------------------------------------------------------------------
     // Solar porthole
-    // -------------------------------------------------------------------------
-
-    // Returns a compact hours string: whole hours drop the decimal,
-    // fractional hours keep one decimal place.  Sign prepended when negative.
-    // e.g. 3.0 → "3"   -0.5 → "-0.5"   1.75 → "1.8"   -12.0 → "-12"
-    function formatSolarHours(hours as Float) as String {
-            var negative = (hours < 0.0);
-            var abs      = negative ? -hours : hours;
-
-            // Round to nearest tenth
-            var tenths = (abs * 10.0 + 0.5).toNumber();
-
-            // Integer division and modulo in Monkey C
-            var whole  = tenths / 10;
-            var frac   = tenths % 10;
-
-            var s;
-            if (frac == 0) {
-                s = whole.toString();
-            } else {
-                s = whole.toString() + "." + frac.toString();
-            }
-            return negative ? ("-" + s) : s;
-        }
-
     function drawSolarPorthole(dc) {
-        // Porthole ring — same dark-grey full circle as the original arc
+        // Porthole ring
         dc.setPenWidth(2);
         dc.setColor(Graphics.COLOR_DK_GRAY, Graphics.COLOR_TRANSPARENT);
         // ARC_CLOCKWISE from 90° to 91° sweeps the full 360°
@@ -375,22 +353,14 @@ class MyWatchFace extends WatchUi.WatchFace {
         var nowSec = Time.now().value();
 
         // Derived solar events
-        // Solar noon = midpoint of daylight
-        // Calculated safely to avoid 32-bit integer overflow
         var noonSec = srSec + (ssSec - srSec) / 2;
-
-        // Solar midnight = midpoint of the night (sunset → next sunrise)
         var midnightTonightSec = ssSec + ((srSec + 86400) - ssSec) / 2;
-
-        // Previous midnight (anchors the beginning of today's window)
         var midnightPrevSec = midnightTonightSec - 86400;
-
-        // Ordered list covering the full 24-hour window around today
         var eventTimes  = [midnightPrevSec, srSec, noonSec, ssSec, midnightTonightSec];
         var eventLabels = ["MIDN","SUNR", "NOON","SUNS", "MIDN"];
         var count       = eventTimes.size();
 
-        // ── Find the most-recently-passed event ───────────────────────────────
+        // Find the most-recently-passed event
         var pastIdx = -1;
         for (var i = 0; i < count; i++) {
             if (eventTimes[i] <= nowSec) {
@@ -426,31 +396,56 @@ class MyWatchFace extends WatchUi.WatchFace {
             }
         }
 
-        // ── Render ────────────────────────────────────────────────────────────
-        // Top line  (FONT_XTINY): hours since/until  — at y = PORTHOLE_CY - 22
-        // Bottom line (FONT_TINY): event label       — at y = PORTHOLE_CY - 2
-        // (Same y-coords as the old HR / zone-label pair, fonts swapped per spec)
+        // Render
+        // Determine the event's absolute clock time
+        var eventEpochSec = 0;
+        if (pastIdx == -1) {
+            eventEpochSec = eventTimes[0];
+        } else if (nowSec - eventTimes[pastIdx] <= 3600) {
+            eventEpochSec = eventTimes[pastIdx];
+        } else {
+            var nextIdx = pastIdx + 1;
+            if (nextIdx >= count) {
+                eventEpochSec = midnightTonightSec + 86400;
+            } else {
+                eventEpochSec = eventTimes[nextIdx];
+            }
+        }
+        var eventTimeStr = TimeHelpers.formatEventTime(eventEpochSec);
+
+        // Top line  (FONT_XTINY): event label
+        // Bottom line (FONT_TINY): HH:MM clock time of that event
         dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
         dc.drawText(PORTHOLE_CX, PORTHOLE_CY - 22,
                     Graphics.FONT_XTINY,
-                    formatSolarHours(displayHours),
+                    displayLabel,
                     Graphics.TEXT_JUSTIFY_CENTER);
         dc.drawText(PORTHOLE_CX, PORTHOLE_CY - 2,
                     Graphics.FONT_TINY,
-                    displayLabel,
+                    eventTimeStr,
                     Graphics.TEXT_JUSTIFY_CENTER);
     }
 
     // -------------------------------------------------------------------------
-    // Activity grid  (6 slots, 3 rows × 2 cols)
+    // Activity grid — cascading into bottom-left and bottom-right corners
+    //
+    // Bottom-left  (TEXT_JUSTIFY_LEFT, x narrows as y rises toward corner):
+    //   y=112  x=6  steps
+    //   y=132  x=18  calories
+    //   y=152  x=30   battery
+    //
+    // Bottom-right (TEXT_JUSTIFY_RIGHT, x widens as y rises toward corner):
+    //   y=112  x=166  distance
+    //   y=132  x=154  bpm
+    //   y=152  x=142  floors
     // -------------------------------------------------------------------------
 
     function drawActivityData(dc) {
         var km        = cachedDistanceCm / 100000.0;
-        var stepsLine = cachedSteps.toString()        + " STP";
-        var distLine  = km.format("%.2f")             + " KM";
-        var calLine   = cachedCalories.toString()     + " CAL";
-        var hrLine    = cachedHrDisplay               + " BPM";
+        var stepsLine = cachedSteps.toString()         + " STP";
+        var distLine  = km.format("%.2f")              + " KM";
+        var calLine   = cachedCalories.toString()      + " CAL";
+        var hrLine    = cachedHrDisplay                + " BPM";
         var elevLine  = cachedFloorsClimbed.toString() + " FL";
 
         var batteryLine = "--%";
@@ -458,22 +453,25 @@ class MyWatchFace extends WatchUi.WatchFace {
             batteryLine = cachedSystemStats.battery.toNumber().toString() + "%";
         }
 
-        var leftX  = 48;
-        var rightX = 124;
-        var rowY   = 118;
-        var rowGap = 16;
-
         dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(leftX,  rowY,              Graphics.FONT_XTINY, stepsLine,   Graphics.TEXT_JUSTIFY_CENTER);
-        dc.drawText(rightX, rowY,              Graphics.FONT_XTINY, distLine,    Graphics.TEXT_JUSTIFY_CENTER);
-        dc.drawText(leftX,  rowY + rowGap,     Graphics.FONT_XTINY, calLine,     Graphics.TEXT_JUSTIFY_CENTER);
-        dc.drawText(rightX, rowY + rowGap,     Graphics.FONT_XTINY, hrLine,      Graphics.TEXT_JUSTIFY_CENTER);
-        dc.drawText(leftX,  rowY + rowGap * 2, Graphics.FONT_XTINY, batteryLine, Graphics.TEXT_JUSTIFY_CENTER);
-        dc.drawText(rightX, rowY + rowGap * 2, Graphics.FONT_XTINY, elevLine,    Graphics.TEXT_JUSTIFY_CENTER);
+
+        // Bottom-left column — left-justified, cascading inward toward corner
+        dc.drawText(6, 112, Graphics.FONT_XTINY, stepsLine,   Graphics.TEXT_JUSTIFY_LEFT);
+        dc.drawText(18, 132, Graphics.FONT_XTINY, calLine,     Graphics.TEXT_JUSTIFY_LEFT);
+        dc.drawText(30, 152, Graphics.FONT_XTINY, batteryLine, Graphics.TEXT_JUSTIFY_LEFT);
+
+        // Bottom-right column — right-justified, cascading inward toward corner
+        dc.drawText(166, 112, Graphics.FONT_XTINY, distLine, Graphics.TEXT_JUSTIFY_RIGHT);
+        dc.drawText(154, 132, Graphics.FONT_XTINY, hrLine,   Graphics.TEXT_JUSTIFY_RIGHT);
+        dc.drawText(142, 152, Graphics.FONT_XTINY, elevLine, Graphics.TEXT_JUSTIFY_RIGHT);
     }
 
     // -------------------------------------------------------------------------
-    // Date  (Gregorian line + Hijri line)
+    // Date — three cascading lines in the top-left corner
+    //
+    //   y=0   x=30  Line 1: EEE TEMP°C        (drawn by drawWeather)
+    //   y=20  x=15  Line 2: YYYY.MM.DD
+    //   y=40  x=0   Line 3: DDMMMYYYY  (Hijri)
     // -------------------------------------------------------------------------
 
     function getHijriDayOffset() as Number {
@@ -489,98 +487,61 @@ class MyWatchFace extends WatchUi.WatchFace {
         var g = cachedGregorianInfo;
         if (g == null) { g = Gregorian.info(Time.now(), Time.FORMAT_SHORT); }
 
-        var gregorianLine = HijriHelpers.weekdayAbbr(g.day_of_week) + " " +
-                            g.day.toString() + " " +
-                            HijriHelpers.gregorianMonthAbbr(g.month);
+        // GREGORIAN DATE: YYYY.MM.DD
+        var gregorianLine = g.year.toString() + "." +
+                            g.month.format("%02d") + "." +
+                            g.day.format("%02d");
 
+        // HIJRI DATE: DD.MMM.YYYY
         var hijri     = HijriHelpers.gregorianToHijri(g.year, g.month, g.day, getHijriDayOffset());
-        var hYear     = (hijri[:year].toNumber() % 100).format("%02d");
-        var hijriLine = hijri[:day].toNumber().toString() + " " +
-                        HijriHelpers.hijriMonthAbbr(hijri[:month].toNumber()) + " " +
-                        hYear;
+        var hijriLine = hijri[:day].toNumber().format("%02d") +
+                        HijriHelpers.hijriMonthAbbr(hijri[:month].toNumber()) +
+                        hijri[:year].toNumber().toString();
 
         dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(22, 8, Graphics.FONT_XTINY, hijriLine,     Graphics.TEXT_JUSTIFY_LEFT);
-        dc.drawText(22, 24,  Graphics.FONT_XTINY, gregorianLine, Graphics.TEXT_JUSTIFY_LEFT);
+        dc.drawText(15, 20, Graphics.FONT_XTINY, gregorianLine, Graphics.TEXT_JUSTIFY_LEFT);
+        dc.drawText(0, 40, Graphics.FONT_XTINY, hijriLine,     Graphics.TEXT_JUSTIFY_LEFT);
     }
 
-    // -------------------------------------------------------------------------
-    // Weather
-    // -------------------------------------------------------------------------
-
-    function getWeatherConditionLabel(condition) {
-        switch (condition) {
-            case Weather.CONDITION_CLEAR:                    return "CLEAR";
-            case Weather.CONDITION_PARTLY_CLOUDY:            return "P.CLD";
-            case Weather.CONDITION_MOSTLY_CLOUDY:            return "M.CLD";
-            case Weather.CONDITION_CLOUDY:                   return "CLOUDY";
-            case Weather.CONDITION_RAIN:
-            case Weather.CONDITION_LIGHT_RAIN:
-            case Weather.CONDITION_HEAVY_RAIN:
-            case Weather.CONDITION_SHOWERS:
-            case Weather.CONDITION_LIGHT_SHOWERS:
-            case Weather.CONDITION_HEAVY_SHOWERS:
-            case Weather.CONDITION_CHANCE_OF_SHOWERS:
-            case Weather.CONDITION_RAIN_SNOW:                return "RAIN";
-            case Weather.CONDITION_SNOW:
-            case Weather.CONDITION_LIGHT_SNOW:
-            case Weather.CONDITION_HEAVY_SNOW:
-            case Weather.CONDITION_CHANCE_OF_SNOW:           return "SNOW";
-            case Weather.CONDITION_THUNDERSTORMS:
-            case Weather.CONDITION_SCATTERED_THUNDERSTORMS:
-            case Weather.CONDITION_CHANCE_OF_THUNDERSTORMS:  return "STORM";
-            case Weather.CONDITION_FOG:
-            case Weather.CONDITION_MIST:                     return "FOG";
-            case Weather.CONDITION_DRIZZLE:                  return "DRIZZL";
-            case Weather.CONDITION_WINDY:                    return "WIND";
-            case Weather.CONDITION_HAZY:
-            case Weather.CONDITION_HAZE:                     return "HAZE";
-            case Weather.CONDITION_PARTLY_CLEAR:
-            case Weather.CONDITION_MOSTLY_CLEAR:
-            case Weather.CONDITION_FAIR:                     return "FAIR";
-            default:                                         return "-----";
-        }
-    }
+    // DOW + WEATHER: "EEE TEMP°C"
 
     function drawWeather(dc) {
         if (!(Toybox has :Weather)) { return; }
 
-        var condition = "--";
-        var tempStr   = "--°C";
+        var g = cachedGregorianInfo;
+        if (g == null) { g = Gregorian.info(Time.now(), Time.FORMAT_SHORT); }
 
-        if (cachedConditions != null) {
-            if (cachedConditions.condition != null) {
-                condition = getWeatherConditionLabel(cachedConditions.condition);
-            }
-            if (condition == null || condition.equals("")) {
-                condition = "--";
-            } else if (condition.length() > 5) {
-                condition = condition.substring(0, 5);
-            }
-            if (cachedConditions.temperature != null) {
-                tempStr = cachedConditions.temperature.toFloat().format("%d") + "°C";
-            }
+        var dayAbbr = HijriHelpers.weekdayAbbr(g.day_of_week);
+
+        var tempStr = "--°C";
+        if (cachedConditions != null && cachedConditions.temperature != null) {
+            tempStr = cachedConditions.temperature.toFloat().format("%d") + "°C";
         }
 
         dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(22, 40, Graphics.FONT_XTINY,
-                    condition + " " + tempStr,
+        dc.drawText(30, 0, Graphics.FONT_XTINY,
+                    dayAbbr + tempStr,
                     Graphics.TEXT_JUSTIFY_LEFT);
     }
 
-    // -------------------------------------------------------------------------
-    // Time
-    // -------------------------------------------------------------------------
+   // Time
 
     function drawTime(dc) {
         var timeString = TimeHelpers.getFormattedTime24(System.getClockTime());
+        var font = Graphics.FONT_NUMBER_THAI_HOT;
+        var cx = dc.getWidth() / 2;
+        var cy = 90;
+
         dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+
+        // Draw the time
         dc.drawText(
-            dc.getWidth() / 2,
-            90,
-            Graphics.FONT_NUMBER_THAI_HOT,
+            cx,
+            cy,
+            font,
             timeString,
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER
         );
+
     }
 }
