@@ -2,14 +2,13 @@
 // MyWatchFace.mc  –  Garmin Instinct 2X / 3 Solar Optimized
 //
 // Layout (top → bottom):
-//   Upper-left    │  [16x16 Icon] + temperature (y≈2) inline using Lucide vectors
+//   Upper-left    │  [24x24 Weather Icon] + temperature (y≈0) inline using FONT_SMALL
 //   Porthole ring │  cx=143 cy=32 r=30  →  steps (top, 1Hz)  ·  HR (bottom, 1Hz)
 //   ─────────────────────────────────────────────────────────────────────────
 //   TIME          │  centered, FONT_NUMBER_THAI_HOT, cy≈82
 //   Hijri date    │  "DD MONTHNAME YYYY"  (month ≤ 7 chars)  centered
 //   Gregorian     │  "EEE YYYYMMDD"  centered
-//   Solar event   │  label (SUNR / SUNS / NOON / MIDN)  centered
-//                 │  clock time of that event  centered
+//   Solar event   │  "LABEL HH:MM"  centered (SUNR / SUNS / NOON / MIDN)
 //   ─────────────────────────────────────────────────────────────────────────
 //   Battery bar   │  4 px tall · fills from left · proportional to battery %
 // ─────────────────────────────────────────────────────────────────────────────
@@ -28,63 +27,62 @@ import Toybox.Math;
 using Toybox.Time;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Lucide-Inspired 16x16 Vector Weather Icons
+// Custom 24x24 Vector Weather Icons (Scaled for FONT_SMALL)
 // ─────────────────────────────────────────────────────────────────────────────
 module MiniVectorIcons {
 
-    // Lucide "Sun" re-mapped to a 16x16 canvas grid (Center anchor at 8,8)
-    function drawSun(dc, x, y) {
-        dc.setPenWidth(1);
-        dc.drawCircle(x + 8, y + 8, 4); // Sun center ring
+    // Upgraded 24x24 Sun (Center anchor at 12,12)
+    function drawSun24(dc, x, y) {
+        dc.setPenWidth(2); // Thickened lines to match FONT_SMALL
+        dc.drawCircle(x + 12, y + 12, 6); // Sun core
 
+        dc.setPenWidth(1);
         // Cardinal rays
-        dc.drawLine(x + 8, y,      x + 8, y + 2);  // Top
-        dc.drawLine(x + 8, y + 14, x + 8, y + 16); // Bottom
-        dc.drawLine(x,     y + 8,  x + 2, y + 8);  // Left
-        dc.drawLine(x + 14, y + 8,  x + 16, y + 8); // Right
+        dc.drawLine(x + 12, y + 1,  x + 12, y + 4);  // Top
+        dc.drawLine(x + 12, y + 20, x + 12, y + 23); // Bottom
+        dc.drawLine(x + 1,  y + 12, x + 4,  y + 12); // Left
+        dc.drawLine(x + 20, y + 12, x + 23, y + 12); // Right
 
         // Intercardinal rays
-        dc.drawLine(x + 3, y + 3,  x + 5, y + 5);  // Top-Left
-        dc.drawLine(x + 13, y + 3, x + 11, y + 5); // Top-Right
-        dc.drawLine(x + 3, y + 13, x + 5, y + 11); // Bottom-Left
-        dc.drawLine(x + 13, y + 13, x + 11, y + 11); // Bottom-Right
+        dc.drawLine(x + 5,  y + 5,  x + 7,  y + 7);   // Top-Left
+        dc.drawLine(x + 19, y + 5,  x + 17, y + 7);   // Top-Right
+        dc.drawLine(x + 5,  y + 19, x + 7,  y + 17);  // Bottom-Left
+        dc.drawLine(x + 19, y + 19, x + 17, y + 17);  // Bottom-Right
     }
 
-    // Lucide "Cloud" compound path structured for a 16x16 viewport
-    function drawCloud(dc, x, y) {
-        dc.setPenWidth(1);
-        // Build the cloud perimeter using larger circular paths
-        dc.drawCircle(x + 4, y + 10, 3);
-        dc.drawCircle(x + 8, y + 6,  4);
-        dc.drawCircle(x + 12, y + 9, 3);
+    // Upgraded 24x24 Cloud path structure
+    function drawCloud24(dc, x, y) {
+        dc.setPenWidth(2);
+        dc.drawCircle(x + 6,  y + 15, 4);
+        dc.drawCircle(x + 12, y + 9,  6);
+        dc.drawCircle(x + 18, y + 14, 4);
 
-        // Punch out internal overlapping pixels to retain outline styling
+        // Wipe internal overlaps with a solid fill block
         dc.setColor(Graphics.COLOR_BLACK, Graphics.COLOR_TRANSPARENT);
-        dc.fillRectangle(x + 3, y + 8, 9, 6);
-        dc.fillRectangle(x + 6, y + 5, 5, 5);
+        dc.fillRectangle(x + 5, y + 11, 14, 8);
+        dc.fillRectangle(x + 9, y + 8,  6,  6);
 
-        // Draw standard flat structural boundary foundation baseline
+        // Main bottom foundation frame baseline
         dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-        dc.drawLine(x + 4, y + 13, x + 12, y + 13);
+        dc.setPenWidth(2);
+        dc.drawLine(x + 6, y + 19, x + 18, y + 19);
     }
 
-    // Lucide "CloudRain" structured drops
-    function drawRain(dc, x, y) {
-        drawCloud(dc, x, y); // Render 16x16 base footprint
-
-        // 16x16 scale downward parallel drop strokes
-        dc.drawLine(x + 6, y + 14, x + 5, y + 16);
-        dc.drawLine(x + 10, y + 14, x + 9, y + 16);
+    // Upgraded 24x24 Cloud + Rain drops
+    function drawRain24(dc, x, y) {
+        drawCloud24(dc, x, y);
+        dc.setPenWidth(1);
+        dc.drawLine(x + 9,  y + 20, x + 8,  y + 23);
+        dc.drawLine(x + 14, y + 20, x + 13, y + 23);
     }
 
-    // Lucide "CloudLightning" dynamic zigzag path layout
-    function drawLightning(dc, x, y) {
-        drawCloud(dc, x, y);
-
-        // Render stylized lightning strikes extending down past y=13 boundary
-        dc.drawLine(x + 8, y + 13, x + 6, y + 15);
-        dc.drawLine(x + 6, y + 15, x + 9, y + 15);
-        dc.drawLine(x + 9, y + 15, x + 7, y + 17);
+    // Upgraded 24x24 Cloud + Lightning strike path
+    function drawLightning24(dc, x, y) {
+        drawCloud24(dc, x, y);
+        dc.setPenWidth(1);
+        dc.drawLine(x + 12, y + 19, x + 9,  y + 22);
+        dc.drawLine(x + 9,  y + 22, x + 13, y + 22);
+        dc.drawLine(x + 13, y + 22, x + 10, y + 25);
     }
 }
 
@@ -280,7 +278,7 @@ class MyWatchFace extends WatchUi.WatchFace {
     const CY_TIME       = 90;
     const Y_HIJRI       = 110;
     const Y_GREGORIAN   = 128;
-    const Y_SOLAR_LABEL = 146;
+    const Y_SOLAR_EVENT = 146;
     const Y_BATTERY_BAR = 172;
     const H_BATTERY_BAR = 4;
 
@@ -338,18 +336,18 @@ class MyWatchFace extends WatchUi.WatchFace {
     // 1Hz Partial Update Lifecycle Window
     // ─────────────────────────────────────────────────────────────────────────
 
-    function onPartialUpdate(dc) {
+    function onPartialUpdate(getDc) {
         updateActivityData();
         refreshCachedHeartRate();
 
-        dc.setClip(CLIP_X, CLIP_Y, CLIP_W, CLIP_H);
+        getDc.setClip(CLIP_X, CLIP_Y, CLIP_W, CLIP_H);
 
-        dc.setColor(Graphics.COLOR_BLACK, Graphics.COLOR_BLACK);
-        dc.fillRectangle(CLIP_X, CLIP_Y, CLIP_W, CLIP_H);
+        getDc.setColor(Graphics.COLOR_BLACK, Graphics.COLOR_BLACK);
+        getDc.fillRectangle(CLIP_X, CLIP_Y, CLIP_W, CLIP_H);
 
-        drawPortholeContents(dc);
+        drawPortholeContents(getDc);
 
-        dc.clearClip();
+        getDc.clearClip();
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -357,14 +355,18 @@ class MyWatchFace extends WatchUi.WatchFace {
     // ─────────────────────────────────────────────────────────────────────────
 
     function onUpdate(dc) {
+        // Refresh porthole data on every update for 1Hz responsiveness
+        updateActivityData();
+        refreshCachedHeartRate();
+
         dc.setColor(Graphics.COLOR_BLACK, Graphics.COLOR_BLACK);
         dc.clear();
 
         drawTime(dc);          // ① large centered time digits
-        drawUpperLeftWeather(dc); // ② Inline 16x16 Vector Icon + Temp
+        drawUpperLeftWeather(dc); // ② Inline 24x24 Weather Vector Icon + FONT_SMALL Temp
         drawPortholeFrame(dc); // ③ ring base layout
         drawPortholeContents(dc); // Draws dynamic fields inside the ring
-        drawCenterDates(dc);   // ④ hijri · gregorian · solar event (below time)
+        drawCenterDates(dc);   // ④ hijri · gregorian · clear text solar event (below time)
         drawBatteryBar(dc);    // ⑤ thin horizontal bar at very bottom
     }
 
@@ -387,7 +389,7 @@ class MyWatchFace extends WatchUi.WatchFace {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // ② Upper Left Corner — Inline 16x16 Lucide Vector Icon & Temperature
+    // ② Upper Left Corner — Inline 24x24 Weather Vector Icon & FONT_SMALL Temp
     // ─────────────────────────────────────────────────────────────────────────
 
     function drawUpperLeftWeather(dc) {
@@ -403,15 +405,15 @@ class MyWatchFace extends WatchUi.WatchFace {
             }
         }
 
-        var iconX = 42;
-        var iconY = 6; // Shifted 1px higher to visually square with the expanded 16x16 profile
+        var iconX = 34;
+        var iconY = 2; // Set to absolute upper boundary to clear space for FONT_SMALL height
 
         dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
 
         switch (conditionCode) {
             case 0:  // CLEAR
             case 23: // MOSTLY_CLEAR
-                MiniVectorIcons.drawSun(dc, iconX, iconY);
+                MiniVectorIcons.drawSun24(dc, iconX, iconY);
                 break;
 
             case 1:  // PARTLY_CLOUDY
@@ -419,7 +421,7 @@ class MyWatchFace extends WatchUi.WatchFace {
             case 20: // CLOUDY
             case 22: // PARTLY_CLOUDY_NIGHT
             case 24: // MOSTLY_CLEAR_NIGHT
-                MiniVectorIcons.drawCloud(dc, iconX, iconY);
+                MiniVectorIcons.drawCloud24(dc, iconX, iconY);
                 break;
 
             case 3:  // RAIN
@@ -429,22 +431,22 @@ class MyWatchFace extends WatchUi.WatchFace {
             case 25: // LIGHT_SHOWERS
             case 26: // SHOWERS
             case 27: // HEAVY_SHOWERS
-                MiniVectorIcons.drawRain(dc, iconX, iconY);
+                MiniVectorIcons.drawRain24(dc, iconX, iconY);
                 break;
 
             case 6:  // THUNDERSTORMS
             case 12: // SCATTERED_THUNDERSTORMS
-                MiniVectorIcons.drawLightning(dc, iconX, iconY);
+                MiniVectorIcons.drawLightning24(dc, iconX, iconY);
                 break;
 
             default:
-                MiniVectorIcons.drawCloud(dc, iconX, iconY);
+                MiniVectorIcons.drawCloud24(dc, iconX, iconY);
                 break;
         }
 
-        // Shift the text tracking right by: 16px (new canvas width) + 5px inline padding
-        var textX = iconX + 16 + 6;
-        dc.drawText(textX, 2, Graphics.FONT_XTINY, tempStr, Graphics.TEXT_JUSTIFY_LEFT);
+        // Horizontal tracker slides exactly 24 pixels + inline padding wide
+        var textX = iconX + 24 + 4;
+        dc.drawText(textX, 2, Graphics.FONT_SMALL, tempStr, Graphics.TEXT_JUSTIFY_LEFT);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -475,7 +477,7 @@ class MyWatchFace extends WatchUi.WatchFace {
 
         // Bottom Line: Live Sub-Second Heart Rate Tracker
         dc.drawText(PORTHOLE_CX, PORTHOLE_CY - 2,
-                    Graphics.FONT_TINY, hrStr + "h",
+                    Graphics.FONT_XTINY, hrStr + "h",
                     Graphics.TEXT_JUSTIFY_CENTER);
     }
 
@@ -556,8 +558,10 @@ class MyWatchFace extends WatchUi.WatchFace {
         }
 
         var eventTimeStr = TimeHelpers.formatEventTime(eventEpochSec);
+        var combinedSolarString = displayLabel + " " + eventTimeStr;
+
         dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, Y_SOLAR_LABEL, Graphics.FONT_XTINY, displayLabel + " " + eventTimeStr,  Graphics.TEXT_JUSTIFY_CENTER);
+        dc.drawText(cx, Y_SOLAR_EVENT, Graphics.FONT_XTINY, combinedSolarString, Graphics.TEXT_JUSTIFY_CENTER);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
