@@ -13,8 +13,6 @@
             <iq:product id="instinct3solar45mm" />
         </iq:products>
         <iq:permissions>
-            <iq:uses-permission id="Background" />
-
             <iq:uses-permission id="UserProfile" />
             <iq:uses-permission id="positioning" />
             <iq:uses-permission id="SensorHistory" />

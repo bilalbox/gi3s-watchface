@@ -1,110 +1,97 @@
 # My Watch Face for Garmin Instinct 3 Solar 45mm
 
-A data-heavy Connect IQ watch face designed for the **Garmin Instinct 3 Solar 45mm** featuring Hijri date support, comprehensive activity metrics, weather information, and solar event tracking.
+A Connect IQ watch face for the **Garmin Instinct 3 Solar 45mm** with stacked custom time digits, dual-calendar dates, weather, and a live activity porthole.
 
-> **Note:** This project's source code is intentionally kept monolithic in a single `MyWatchFace.mc` file to facilitate easy sharing and analysis within LLM chat contexts. All modules, classes, and logic reside in this one file.
+> **Note:** Source is intentionally monolithic in a single `MyWatchFace.mc` file for easy sharing and review.
+
+## Layout
+
+```
+┌─────────────────────────────────────┐
+│ [weather] 12°C          ╭─ steps ─╮ │
+│                         │    0s     │ │
+│   HH                    ╰─  HR ────╯ │
+│   MM              SUN               │
+│                                     │
+│        15 DHU HIJ 1447              │
+│        31 MAY 2026                  │
+│▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░░░░░░░░░░░░░░░░░░░░│ battery
+└─────────────────────────────────────┘
+```
 
 ## Features
 
-### Date Display
+### Time
 
-- **Hijri date**: Day, 3-letter month abbreviation, and 2-digit year (e.g., `26 SHA 29`)
-- **Gregorian date**: Weekday (2-letter abbreviation), day, and 3-letter month (e.g., `SU 26 APR`)
-- **Hijri adjustment**: Configurable ±2 day offset to align tabular Hijri calculations with local moon sighting
+- **Stacked 24 h** — `HH` over `MM` (no colon)
+- **Custom poly-path digits** — block outlines, 4 px stroke, slashed zero (2 px slash)
+- Positioned upper-left toward center; minutes row aligned with weekday label
 
-### Time Display
+### Dates
 
-- 24-hour format (`HH:mm`) using large Thai Hot numeric font
-- Updates once per minute (no per-second partial updates for power efficiency)
+- **Hijri** — `DD MONTHNAME YYYY` (e.g. `15 DHU HIJ 1447`)
+- **Gregorian** — `DD MMM YYYY` (e.g. `31 MAY 2026`)
+- **Weekday** — `SUN` / `MON` / … in `FONT_XTINY`, under the porthole, vertically aligned with the minutes row
+- **Hijri offset** — configurable ±2 days (Settings → Hijri date shift)
 
-### Heart Rate
+### Weather (upper-left)
 
-- Displays average heart rate from the last 60 seconds of history
-- Falls back to live HR or SensorHistory if history is unavailable
-- Shows `--` BPM when no valid reading is available
+- 24×24 vector condition icon + temperature in °C
+- Refreshed at most every **15 minutes**
 
-### Activity Metrics
+### Activity porthole (upper-right)
 
-| Position | Metric | Format |
-|----------|--------|--------|
-| Top-left | Steps | `NNNN STP` |
-| Top-right | Distance | `X.XX KM` |
-| Middle-left | Calories | `NNN CAL` |
-| Middle-right | Heart Rate | `NNN BPM` |
-| Bottom-left | Battery | `NN%` |
-| Bottom-right | Floors | `NN FL` |
+- **Steps** — top line (`NNNs`), 1 Hz partial updates
+- **Heart rate** — bottom line (`NNh`), partial updates every **5 seconds**
+- Only the 64×64 px clip region is redrawn at 1 Hz; the rest of the face updates once per minute
 
-### Weather
+### Battery bar
 
-- Current condition (5-character label) and temperature in °C
-- Updates every 15 minutes when available
+- 4 px bar at the bottom, proportional fill
 
-### Solar Porthole (Top-right Circular Window)
+## Power efficiency
 
-Displays time until or since the next/previous solar event:
+| Mechanism | Detail |
+|-----------|--------|
+| Minute tick | `Timer` fires every 60 s for time, dates, weather, and full redraw |
+| Partial updates | Clipped to porthole only (~64×64 px), not the full 176×176 screen |
+| HR throttling | HR history queried every 5 s in partial updates, not every frame |
+| Cached weather | `Weather.getCurrentConditions()` at most every 15 min |
+| Cached battery | `System.getSystemStats()` at most every 5 min |
+| No background service | `Background` permission removed — no wake-ups when face is inactive |
+| Draw from cache | Full `onUpdate` reads cached values; sensor APIs not called per redraw |
 
-- **Events tracked**: Midnight, Sunrise, Noon, Sunset
-- **Display format**: Hours until/until event (negative when within 1 hour past)
-- **Example**: `-0.5` with label `SUNR` means 30 minutes past sunrise
-
-## Hijri Date Adjustment
-
-The tabular Hijri calendar may not match local moon sightings. A ±2 day adjustment is available:
-
-1. **On-watch**: Settings → Hijri date shift → Select -2, -1, 0, +1, or +2 days
-2. **Garmin Connect/Express**: Set the numeric property in the watch face settings
-
-## Technical Details
-
-### File Structure
-
-```
-my-gi3s-watchface/
-├── source/
-│   └── MyWatchFace.mc    # Single monolithic source file
-├── resources/
-│   ├── Strings.xml       # App strings and settings
-│   └── Drawables.xml     # Drawable resources
-├── manifest.xml          # App manifest and permissions
-└── monkey.jungle         # Build configuration
-```
-
-### Modules in MyWatchFace.mc
+## Modules
 
 | Module | Purpose |
 |--------|---------|
-| `HijriHelpers` | Gregorian↔Julian day conversion, Hijri date calculation |
-| `TimeHelpers` | Time formatting utilities |
+| `MiniVectorIcons` | 24×24 vector weather icons |
+| `PolyTimeDigits` | Block-outline poly-path digit renderer |
+| `HijriHelpers` | Hijri calendar + date label helpers |
+| `TimeHelpers` | Hour/minute formatting for stacked time |
 
-### Classes in MyWatchFace.mc
+## Permissions
 
-| Class | Purpose |
-|-------|---------|
-| `HijriOffsetSettingsMenu` | Settings menu for Hijri offset selection |
-| `HijriOffsetMenuDelegate` | Handles menu selection and saves offset |
-| `MyProjectApp` | Application entry point |
-| `MyWatchFace` | Main watch face view with all drawing logic |
-
-### Permissions Required
-
-- `UserProfile` - For user-specific data
-- `positioning` - For weather location data
-- `SensorHistory` - For heart rate history access
+| Permission | Used for |
+|------------|----------|
+| `UserProfile` | User profile data |
+| `positioning` | Weather location |
+| `SensorHistory` | Heart rate history fallback |
 
 ## Building
 
 ### Prerequisites
 
-1. Install the [Connect IQ SDK](https://developer.garmin.com/connect-iq/connect-iq-basics/getting-started/)
-2. Place your `developer_key.der` in the project root
+1. [Connect IQ SDK](https://developer.garmin.com/connect-iq/connect-iq-basics/getting-started/)
+2. `developer_key.der` in the project root
 
-### Build Command
+### Build
 
 ```shell
 monkeyc -o watchface.prg -d instinct3solar45mm -y developer_key.der -f monkey.jungle
 ```
 
-### Emulator Testing
+### Simulator
 
 ```shell
 connectiq
@@ -113,9 +100,9 @@ monkeydo watchface.prg instinct3solar45mm
 
 ## Installation
 
-1. Connect your Instinct 3 Solar 45mm via USB
-2. Copy `watchface.prg` to `GARMIN/APPS/` on the device
-3. Select the watch face from the watch's settings menu
+1. Connect the watch via USB
+2. Copy `watchface.prg` to `GARMIN/APPS/`
+3. Select the watch face in watch settings
 
 ## Screenshot
 

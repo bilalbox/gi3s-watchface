@@ -5,10 +5,10 @@
 //   Upper-left    │  [24x24 Weather Icon] + temperature (y≈0) inline using FONT_SMALL
 //   Porthole ring │  cx=143 cy=32 r=30  →  steps (top, 1Hz)  ·  HR (bottom, 1Hz)
 //   ─────────────────────────────────────────────────────────────────────────
-//   TIME          │  centered, FONT_NUMBER_THAI_HOT, cy≈82
+//   TIME          │  stacked HH/MM, block-outline poly-path digits, cy≈76
+//   DOW           │  "SUN" etc · FONT_XTINY · under porthole · inline w/ minutes
 //   Hijri date    │  "DD MONTHNAME YYYY"  (month ≤ 7 chars)  centered
-//   Gregorian     │  "EEE YYYYMMDD"  centered
-//   Solar event   │  "LABEL HH:MM"  centered (SUNR / SUNS / NOON / MIDN)
+//   Gregorian     │  "DD MMM YYYY"  centered
 //   ─────────────────────────────────────────────────────────────────────────
 //   Battery bar   │  4 px tall · fills from left · proportional to battery %
 // ─────────────────────────────────────────────────────────────────────────────
@@ -87,6 +87,157 @@ module MiniVectorIcons {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Poly-path time digits (hand-coded, no system font)
+// Simple block outlines, slashed zero; base grid 14×20 scaled ×2 → 28×40 px cell
+// ─────────────────────────────────────────────────────────────────────────────
+module PolyTimeDigits {
+
+    const BASE_W  = 14;
+    const BASE_H  = 20;
+    const SCALE   = 2;
+    const GAP     = 2;   // gap between digits in base units (before scale)
+    const STROKE       = 4;
+    const SLASH_STROKE = 2;   // thinner diagonal on zero
+
+    function digitWidth() as Number {
+        return BASE_W * SCALE;
+    }
+
+    function digitHeight() as Number {
+        return BASE_H * SCALE;
+    }
+
+    function digitGap() as Number {
+        return GAP * SCALE;
+    }
+
+    function measureTextWidth(text as String) as Number {
+        var n = text.length();
+        if (n <= 0) { return 0; }
+        return n * digitWidth() + (n - 1) * digitGap();
+    }
+
+    function drawSegment(dc, ox, oy, x1, y1, x2, y2) as Void {
+        dc.drawLine(
+            ox + x1 * SCALE, oy + y1 * SCALE,
+            ox + x2 * SCALE, oy + y2 * SCALE
+        );
+    }
+
+    function drawDigit(dc, digit as Number, ox, oy) as Void {
+        switch (digit) {
+            case 0:
+                drawSegment(dc, ox, oy, 2,  1, 12,  1);
+                drawSegment(dc, ox, oy, 2,  1,  2, 19);
+                drawSegment(dc, ox, oy, 12, 1, 12, 19);
+                drawSegment(dc, ox, oy, 2, 19, 12, 19);
+                dc.setPenWidth(SLASH_STROKE);
+                drawSegment(dc, ox, oy, 10, 4,  4, 16);
+                dc.setPenWidth(STROKE);
+                break;
+            case 1:
+                drawSegment(dc, ox, oy, 7, 1, 7, 19);
+                break;
+            case 2:
+                drawSegment(dc, ox, oy, 2,  1, 12,  1);
+                drawSegment(dc, ox, oy, 12, 1, 12, 10);
+                drawSegment(dc, ox, oy, 2,  10, 12, 10);
+                drawSegment(dc, ox, oy, 2,  10,  2, 19);
+                drawSegment(dc, ox, oy, 2,  19, 12, 19);
+                break;
+            case 3:
+                drawSegment(dc, ox, oy, 2,  1, 12,  1);
+                drawSegment(dc, ox, oy, 12, 1, 12, 19);
+                drawSegment(dc, ox, oy, 2,  10, 11, 10);
+                drawSegment(dc, ox, oy, 2,  19, 12, 19);
+                break;
+            case 4:
+                drawSegment(dc, ox, oy, 2,  1,  2, 10);
+                drawSegment(dc, ox, oy, 2,  10, 12, 10);
+                drawSegment(dc, ox, oy, 12,  1, 12, 19);
+                break;
+            case 5:
+                drawSegment(dc, ox, oy, 12,  1,  2,  1);
+                drawSegment(dc, ox, oy, 2,  1,  2, 10);
+                drawSegment(dc, ox, oy, 2,  10, 12, 10);
+                drawSegment(dc, ox, oy, 12, 10, 12, 19);
+                drawSegment(dc, ox, oy, 2,  19, 12, 19);
+                break;
+            case 6:
+                drawSegment(dc, ox, oy, 2,  1, 12,  1);
+                drawSegment(dc, ox, oy, 2,  1,  2, 19);
+                drawSegment(dc, ox, oy, 2,  10, 12, 10);
+                drawSegment(dc, ox, oy, 12, 10, 12, 19);
+                drawSegment(dc, ox, oy, 2,  19, 12, 19);
+                break;
+            case 7:
+                drawSegment(dc, ox, oy, 2,  1, 12,  1);
+                drawSegment(dc, ox, oy, 12,  1, 12, 19);
+                break;
+            case 8:
+                drawSegment(dc, ox, oy, 2,  1, 12,  1);
+                drawSegment(dc, ox, oy, 2,  1,  2, 19);
+                drawSegment(dc, ox, oy, 12,  1, 12, 19);
+                drawSegment(dc, ox, oy, 2,  10, 12, 10);
+                drawSegment(dc, ox, oy, 2,  19, 12, 19);
+                break;
+            case 9:
+                drawSegment(dc, ox, oy, 2,  1, 12,  1);
+                drawSegment(dc, ox, oy, 2,  1,  2, 10);
+                drawSegment(dc, ox, oy, 12,  1, 12, 19);
+                drawSegment(dc, ox, oy, 2,  10, 12, 10);
+                drawSegment(dc, ox, oy, 2,  19, 12, 19);
+                break;
+        }
+    }
+
+    function charToDigit(ch as String) as Number {
+        if (ch.equals("0")) { return 0; }
+        if (ch.equals("1")) { return 1; }
+        if (ch.equals("2")) { return 2; }
+        if (ch.equals("3")) { return 3; }
+        if (ch.equals("4")) { return 4; }
+        if (ch.equals("5")) { return 5; }
+        if (ch.equals("6")) { return 6; }
+        if (ch.equals("7")) { return 7; }
+        if (ch.equals("8")) { return 8; }
+        if (ch.equals("9")) { return 9; }
+        return -1;
+    }
+
+    function drawText(dc, text as String, cx, yTop) as Void {
+        var totalW = measureTextWidth(text);
+        var x = cx - totalW / 2;
+        var step = digitWidth() + digitGap();
+        var len  = text.length();
+
+        dc.setPenWidth(STROKE);
+        for (var i = 0; i < len; i++) {
+            var d = charToDigit(text.substring(i, i + 1));
+            if (d >= 0) {
+                drawDigit(dc, d, x, yTop);
+            }
+            x += step;
+        }
+    }
+
+    function stackHeight(stackGap as Number) as Number {
+        return digitHeight() * 2 + stackGap;
+    }
+
+    function drawStacked24h(dc, hourStr as String, minStr as String, cx, cyCenter, stackGap as Number) as Void {
+        var rowH   = digitHeight();
+        var totalH = stackHeight(stackGap);
+        var hourY  = cyCenter - totalH / 2;
+        var minY   = hourY + rowH + stackGap;
+
+        dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+        drawText(dc, hourStr, cx, hourY);
+        drawText(dc, minStr, cx, minY);
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Hijri calendar helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -160,6 +311,24 @@ module HijriHelpers {
             default: return "---";
         }
     }
+
+    function gregorianMonthName(month as Number) as String {
+        switch (month) {
+            case 1:  return "JAN";
+            case 2:  return "FEB";
+            case 3:  return "MAR";
+            case 4:  return "APR";
+            case 5:  return "MAY";
+            case 6:  return "JUN";
+            case 7:  return "JUL";
+            case 8:  return "AUG";
+            case 9:  return "SEP";
+            case 10: return "OCT";
+            case 11: return "NOV";
+            case 12: return "DEC";
+            default: return "---";
+        }
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -168,20 +337,11 @@ module HijriHelpers {
 
 module TimeHelpers {
 
-    function getFormattedTime24(clockTime) {
-        return Lang.format("$1$:$2$", [
-            clockTime.hour.format("%02d"),
-            clockTime.min.format("%02d")
-        ]);
-    }
-
-    function formatEventTime(epochSec as Number) as String {
-        var t    = new Time.Moment(epochSec);
-        var info = Gregorian.info(t, Time.FORMAT_SHORT);
-        return Lang.format("$1$:$2$", [
-            info.hour.format("%02d"),
-            info.min.format("%02d")
-        ]);
+    function getHourMinute24(clockTime) as Dictionary {
+        return {
+            :hour => clockTime.hour.format("%02d"),
+            :min  => clockTime.min.format("%02d")
+        };
     }
 }
 
@@ -255,11 +415,10 @@ class MyWatchFace extends WatchUi.WatchFace {
     var cachedSystemStats        = null;
     const SYSTEM_STATS_UPDATE_INTERVAL = 5 * 60;
 
-    var cachedSteps         = 0;
-    var cachedDistanceCm    = 0.0;
-    var cachedCalories      = 0;
-    var cachedFloorsClimbed = 0;
-    var cachedMoveBarLevel  = 0;
+    var lastHrPartialFetchTime   = 0;
+    const HR_PARTIAL_UPDATE_INTERVAL = 5;
+
+    var cachedSteps = 0;
 
     var cachedGregorianInfo = null;
 
@@ -275,10 +434,12 @@ class MyWatchFace extends WatchUi.WatchFace {
     const CLIP_H = 64;
 
     // Vertical layout constants (pixels from top of 176 px display)
-    const CY_TIME       = 90;
-    const Y_HIJRI       = 110;
-    const Y_GREGORIAN   = 128;
-    const Y_SOLAR_EVENT = 146;
+    // Time stack: 2×40 px rows + 6 px gap = 86 px; CY_TIME is stack vertical center
+    const CY_TIME         = 76;    // +10 px up from prior anchor (86)
+    const TIME_STACK_GAP  = 6;
+    const TIME_CX_OFFSET  = -20;   // +10 px further left from prior nudge (-10)
+    const Y_HIJRI         = 128;
+    const Y_GREGORIAN     = 148;
     const Y_BATTERY_BAR = 172;
     const H_BATTERY_BAR = 4;
 
@@ -329,6 +490,7 @@ class MyWatchFace extends WatchUi.WatchFace {
 
         updateActivityData();
         refreshCachedHeartRate();
+        lastHrPartialFetchTime = Time.now().value();
         WatchUi.requestUpdate();
     }
 
@@ -338,7 +500,11 @@ class MyWatchFace extends WatchUi.WatchFace {
 
     function onPartialUpdate(getDc) {
         updateActivityData();
-        refreshCachedHeartRate();
+        var now = Time.now().value();
+        if ((now - lastHrPartialFetchTime) >= HR_PARTIAL_UPDATE_INTERVAL) {
+            refreshCachedHeartRate();
+            lastHrPartialFetchTime = now;
+        }
 
         getDc.setClip(CLIP_X, CLIP_Y, CLIP_W, CLIP_H);
 
@@ -355,18 +521,15 @@ class MyWatchFace extends WatchUi.WatchFace {
     // ─────────────────────────────────────────────────────────────────────────
 
     function onUpdate(dc) {
-        // Refresh porthole data on every update for 1Hz responsiveness
-        updateActivityData();
-        refreshCachedHeartRate();
-
         dc.setColor(Graphics.COLOR_BLACK, Graphics.COLOR_BLACK);
         dc.clear();
 
         drawTime(dc);          // ① large centered time digits
+        drawWeekdayByPorthole(dc); // ①b DOW inline with minutes, under porthole
         drawUpperLeftWeather(dc); // ② Inline 24x24 Weather Vector Icon + FONT_SMALL Temp
         drawPortholeFrame(dc); // ③ ring base layout
         drawPortholeContents(dc); // Draws dynamic fields inside the ring
-        drawCenterDates(dc);   // ④ hijri · gregorian · clear text solar event (below time)
+        drawCenterDates(dc);   // ④ hijri · gregorian (below time)
         drawBatteryBar(dc);    // ⑤ thin horizontal bar at very bottom
     }
 
@@ -375,15 +538,32 @@ class MyWatchFace extends WatchUi.WatchFace {
     // ─────────────────────────────────────────────────────────────────────────
 
     function drawTime(dc) {
-        var timeString = TimeHelpers.getFormattedTime24(System.getClockTime());
-        var cx = dc.getWidth() / 2;
+        var parts   = TimeHelpers.getHourMinute24(System.getClockTime());
+        var hourStr = parts[:hour] as String;
+        var minStr  = parts[:min] as String;
+        var cx      = dc.getWidth() / 2 + TIME_CX_OFFSET;
+
+        PolyTimeDigits.drawStacked24h(dc, hourStr, minStr, cx, CY_TIME, TIME_STACK_GAP);
+    }
+
+    function getMinuteRowCenterY() as Number {
+        var rowH   = PolyTimeDigits.digitHeight();
+        var totalH = PolyTimeDigits.stackHeight(TIME_STACK_GAP);
+        var hourY  = CY_TIME - totalH / 2;
+        var minY   = hourY + rowH + TIME_STACK_GAP;
+        return minY + rowH / 2;
+    }
+
+    function drawWeekdayByPorthole(dc) {
+        var g = cachedGregorianInfo;
+        if (g == null) { g = Gregorian.info(Time.now(), Time.FORMAT_SHORT); }
 
         dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
         dc.drawText(
-            cx,
-            CY_TIME,
-            Graphics.FONT_NUMBER_THAI_HOT,
-            timeString,
+            PORTHOLE_CX,
+            getMinuteRowCenterY(),
+            Graphics.FONT_XTINY,
+            HijriHelpers.weekdayAbbr(g.day_of_week),
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER
         );
     }
@@ -496,72 +676,13 @@ class MyWatchFace extends WatchUi.WatchFace {
         var hijriYr  = hijri[:year].toNumber().toString();
         var hijriLine = hijriDay + " " + hijriMon + " " + hijriYr;
 
-        var dow = HijriHelpers.weekdayAbbr(g.day_of_week);
-        var gregorianLine = dow + " " + g.year.toString() +
-                            g.month.format("%02d") + g.day.format("%02d");
+        var gregorianLine = g.day.format("%02d") + " " +
+                            HijriHelpers.gregorianMonthName(g.month) + " " +
+                            g.year.toString();
 
         dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
         dc.drawText(cx, Y_HIJRI,     Graphics.FONT_XTINY, hijriLine,     Graphics.TEXT_JUSTIFY_CENTER);
         dc.drawText(cx, Y_GREGORIAN, Graphics.FONT_XTINY, gregorianLine, Graphics.TEXT_JUSTIFY_CENTER);
-
-        drawSolarEvent(dc, cx);
-    }
-
-    function drawSolarEvent(dc, cx) {
-        if (!(Toybox has :Weather) || cachedConditions == null) { return; }
-
-        var location = cachedConditions.observationLocationPosition;
-        if (location == null) { return; }
-
-        var sunrise = Weather.getSunrise(location, Time.now());
-        var sunset  = Weather.getSunset(location, Time.now());
-        if (sunrise == null || sunset == null) { return; }
-
-        var srSec  = sunrise.value();
-        var ssSec  = sunset.value();
-        var nowSec = Time.now().value();
-
-        var noonSec            = srSec + (ssSec - srSec) / 2;
-        var midnightTonightSec = ssSec + ((srSec + 86400) - ssSec) / 2;
-        var midnightPrevSec    = midnightTonightSec - 86400;
-
-        var eventTimes  = [midnightPrevSec, srSec, noonSec, ssSec, midnightTonightSec];
-        var eventLabels = ["MIDN", "SUNR", "NOON", "SUNS", "MIDN"];
-        var count       = eventTimes.size();
-
-        var pastIdx = -1;
-        for (var i = 0; i < count; i++) {
-            if (eventTimes[i] <= nowSec) { pastIdx = i; }
-        }
-
-        var displayLabel  = "";
-        var eventEpochSec = 0;
-
-        if (pastIdx == -1) {
-            displayLabel  = eventLabels[0];
-            eventEpochSec = eventTimes[0];
-        } else {
-            var elapsed = nowSec - eventTimes[pastIdx];
-            if (elapsed <= 3600) {
-                displayLabel  = eventLabels[pastIdx];
-                eventEpochSec = eventTimes[pastIdx];
-            } else {
-                var nextIdx = pastIdx + 1;
-                if (nextIdx >= count) {
-                    displayLabel  = "MIDN";
-                    eventEpochSec = midnightTonightSec + 86400;
-                } else {
-                    displayLabel  = eventLabels[nextIdx];
-                    eventEpochSec = eventTimes[nextIdx];
-                }
-            }
-        }
-
-        var eventTimeStr = TimeHelpers.formatEventTime(eventEpochSec);
-        var combinedSolarString = displayLabel + " " + eventTimeStr;
-
-        dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, Y_SOLAR_EVENT, Graphics.FONT_XTINY, combinedSolarString, Graphics.TEXT_JUSTIFY_CENTER);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -600,18 +721,8 @@ class MyWatchFace extends WatchUi.WatchFace {
 
     function updateActivityData() {
         var info = ActivityMonitor.getInfo();
-        if (info != null) {
-            if (info.moveBarLevel  != null) { cachedMoveBarLevel  = info.moveBarLevel; }
-            if (info.steps         != null) { cachedSteps         = info.steps; }
-            if (info.distance      != null) { cachedDistanceCm    = info.distance; }
-            if (info.calories      != null) { cachedCalories      = info.calories; }
-            if (info.metersClimbed != null) {
-                cachedFloorsClimbed = ((info.metersClimbed.toFloat() / 3.0) + 0.5).toNumber();
-            } else {
-                cachedFloorsClimbed = 0;
-            }
-        } else {
-            cachedFloorsClimbed = 0;
+        if (info != null && info.steps != null) {
+            cachedSteps = info.steps;
         }
         updateSystemStats();
     }
