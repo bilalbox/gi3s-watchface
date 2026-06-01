@@ -3,9 +3,9 @@
 //
 // Layout (top → bottom):
 //   Upper-left    │  [24x24 Weather PNG] + temperature (y≈0) inline using FONT_SMALL
-//   Porthole ring │  cx=143 cy=32 r=30  →  HR (top)  ·  steps (center, 1Hz)
+//   Porthole ring │  cx=143 cy=40 r=30  →  HR (top)  ·  steps (center)
 //   ─────────────────────────────────────────────────────────────────────────
-//   TIME          │  stacked HH/MM, block-outline poly-path digits, cy≈76
+//   TIME          │  stacked HH/MM, Source Code Pro Bold bitmap digits (28×40), cy≈76
 //   DOW           │  "SUN" etc · FONT_XTINY · under porthole · inline w/ minutes
 //   Hijri date    │  "DD MONTHNAME YYYY"  (month ≤ 7 chars)  centered
 //   Gregorian     │  "DD MMM YYYY"  centered
@@ -27,108 +27,71 @@ import Toybox.Math;
 using Toybox.Time;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Poly-path time digits (hand-coded, no system font)
-// Simple block outlines, slashed zero; base grid 14×20 scaled ×2 → 28×40 px cell
+// Clock digits — per-digit Source Code Pro Bold bitmap sprites (28×40 px)
 // ─────────────────────────────────────────────────────────────────────────────
-module PolyTimeDigits {
+module ClockDigits {
 
-    const BASE_W  = 14;
-    const BASE_H  = 20;
-    const SCALE   = 2;
-    const GAP     = 2;   // gap between digits in base units (before scale)
-    const STROKE       = 4;
-    const SLASH_STROKE = 2;   // thinner diagonal on zero
+    const GAP = 4;   // px between digit cells
+
+    var digit0 = null;
+    var digit1 = null;
+    var digit2 = null;
+    var digit3 = null;
+    var digit4 = null;
+    var digit5 = null;
+    var digit6 = null;
+    var digit7 = null;
+    var digit8 = null;
+    var digit9 = null;
+
+    function init() as Void {
+        if (digit0 != null) { return; }
+        digit0 = WatchUi.loadResource(Rez.Drawables.digit_0) as BitmapResource;
+        digit1 = WatchUi.loadResource(Rez.Drawables.digit_1) as BitmapResource;
+        digit2 = WatchUi.loadResource(Rez.Drawables.digit_2) as BitmapResource;
+        digit3 = WatchUi.loadResource(Rez.Drawables.digit_3) as BitmapResource;
+        digit4 = WatchUi.loadResource(Rez.Drawables.digit_4) as BitmapResource;
+        digit5 = WatchUi.loadResource(Rez.Drawables.digit_5) as BitmapResource;
+        digit6 = WatchUi.loadResource(Rez.Drawables.digit_6) as BitmapResource;
+        digit7 = WatchUi.loadResource(Rez.Drawables.digit_7) as BitmapResource;
+        digit8 = WatchUi.loadResource(Rez.Drawables.digit_8) as BitmapResource;
+        digit9 = WatchUi.loadResource(Rez.Drawables.digit_9) as BitmapResource;
+    }
+
+    function bitmapForDigit(d as Number) as BitmapResource or Null {
+        switch (d) {
+            case 0: return digit0;
+            case 1: return digit1;
+            case 2: return digit2;
+            case 3: return digit3;
+            case 4: return digit4;
+            case 5: return digit5;
+            case 6: return digit6;
+            case 7: return digit7;
+            case 8: return digit8;
+            case 9: return digit9;
+        }
+        return null;
+    }
 
     function digitWidth() as Number {
-        return BASE_W * SCALE;
+        init();
+        return digit0.getWidth();
     }
 
     function digitHeight() as Number {
-        return BASE_H * SCALE;
+        init();
+        return digit0.getHeight();
     }
 
     function digitGap() as Number {
-        return GAP * SCALE;
+        return GAP;
     }
 
     function measureTextWidth(text as String) as Number {
         var n = text.length();
         if (n <= 0) { return 0; }
         return n * digitWidth() + (n - 1) * digitGap();
-    }
-
-    function drawSegment(dc, ox, oy, x1, y1, x2, y2) as Void {
-        dc.drawLine(
-            ox + x1 * SCALE, oy + y1 * SCALE,
-            ox + x2 * SCALE, oy + y2 * SCALE
-        );
-    }
-
-    function drawDigit(dc, digit as Number, ox, oy) as Void {
-        switch (digit) {
-            case 0:
-                drawSegment(dc, ox, oy, 2,  1, 12,  1);
-                drawSegment(dc, ox, oy, 2,  1,  2, 19);
-                drawSegment(dc, ox, oy, 12, 1, 12, 19);
-                drawSegment(dc, ox, oy, 2, 19, 12, 19);
-                dc.setPenWidth(SLASH_STROKE);
-                drawSegment(dc, ox, oy, 10, 4,  4, 16);
-                dc.setPenWidth(STROKE);
-                break;
-            case 1:
-                drawSegment(dc, ox, oy, 7, 1, 7, 19);
-                break;
-            case 2:
-                drawSegment(dc, ox, oy, 2,  1, 12,  1);
-                drawSegment(dc, ox, oy, 12, 1, 12, 10);
-                drawSegment(dc, ox, oy, 2,  10, 12, 10);
-                drawSegment(dc, ox, oy, 2,  10,  2, 19);
-                drawSegment(dc, ox, oy, 2,  19, 12, 19);
-                break;
-            case 3:
-                drawSegment(dc, ox, oy, 2,  1, 12,  1);
-                drawSegment(dc, ox, oy, 12, 1, 12, 19);
-                drawSegment(dc, ox, oy, 2,  10, 11, 10);
-                drawSegment(dc, ox, oy, 2,  19, 12, 19);
-                break;
-            case 4:
-                drawSegment(dc, ox, oy, 2,  1,  2, 10);
-                drawSegment(dc, ox, oy, 2,  10, 12, 10);
-                drawSegment(dc, ox, oy, 12,  1, 12, 19);
-                break;
-            case 5:
-                drawSegment(dc, ox, oy, 12,  1,  2,  1);
-                drawSegment(dc, ox, oy, 2,  1,  2, 10);
-                drawSegment(dc, ox, oy, 2,  10, 12, 10);
-                drawSegment(dc, ox, oy, 12, 10, 12, 19);
-                drawSegment(dc, ox, oy, 2,  19, 12, 19);
-                break;
-            case 6:
-                drawSegment(dc, ox, oy, 2,  1, 12,  1);
-                drawSegment(dc, ox, oy, 2,  1,  2, 19);
-                drawSegment(dc, ox, oy, 2,  10, 12, 10);
-                drawSegment(dc, ox, oy, 12, 10, 12, 19);
-                drawSegment(dc, ox, oy, 2,  19, 12, 19);
-                break;
-            case 7:
-                drawSegment(dc, ox, oy, 2,  1, 12,  1);
-                drawSegment(dc, ox, oy, 12,  1, 12, 19);
-                break;
-            case 8:
-                drawSegment(dc, ox, oy, 2,  1, 12,  1);
-                drawSegment(dc, ox, oy, 2,  1,  2, 19);
-                drawSegment(dc, ox, oy, 12,  1, 12, 19);
-                drawSegment(dc, ox, oy, 2,  10, 12, 10);
-                drawSegment(dc, ox, oy, 2,  19, 12, 19);
-                break;
-            case 9:
-                drawSegment(dc, ox, oy, 2,  1, 12,  1);
-                drawSegment(dc, ox, oy, 2,  1,  2, 10);
-                drawSegment(dc, ox, oy, 12,  1, 12, 19);
-                drawSegment(dc, ox, oy, 2,  10, 12, 10);
-                drawSegment(dc, ox, oy, 2,  19, 12, 19);
-                break;
-        }
     }
 
     function charToDigit(ch as String) as Number {
@@ -146,16 +109,19 @@ module PolyTimeDigits {
     }
 
     function drawText(dc, text as String, cx, yTop) as Void {
+        init();
         var totalW = measureTextWidth(text);
         var x = cx - totalW / 2;
         var step = digitWidth() + digitGap();
         var len  = text.length();
 
-        dc.setPenWidth(STROKE);
         for (var i = 0; i < len; i++) {
             var d = charToDigit(text.substring(i, i + 1));
             if (d >= 0) {
-                drawDigit(dc, d, x, yTop);
+                var bmp = bitmapForDigit(d);
+                if (bmp != null) {
+                    dc.drawBitmap(x, yTop, bmp);
+                }
             }
             x += step;
         }
@@ -171,7 +137,6 @@ module PolyTimeDigits {
         var hourY  = cyCenter - totalH / 2;
         var minY   = hourY + rowH + stackGap;
 
-        dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
         drawText(dc, hourStr, cx, hourY);
         drawText(dc, minStr, cx, minY);
     }
@@ -355,9 +320,6 @@ class MyWatchFace extends WatchUi.WatchFace {
     var cachedSystemStats        = null;
     const SYSTEM_STATS_UPDATE_INTERVAL = 5 * 60;
 
-    var lastHrPartialFetchTime   = 0;
-    const HR_PARTIAL_UPDATE_INTERVAL = 5;
-
     var cachedSteps = 0;
 
     var cachedGregorianInfo = null;
@@ -369,14 +331,8 @@ class MyWatchFace extends WatchUi.WatchFace {
     const PORTHOLE_CY = 40;
     const PORTHOLE_R  = 30;
     const PORTHOLE_ICON_GAP = 2;
-    const Y_PORTHOLE_HR     = PORTHOLE_CY - 20; // upper porthole (above prior steps row)
-    const Y_PORTHOLE_STEPS  = PORTHOLE_CY;      // vertical center — widest chord for long counts
-
-    // Bounding Box Clipping Region for 1Hz Partial Updates inside the Porthole
-    const CLIP_X = 111; // 143 - 30 - 2
-    const CLIP_Y = 0;   // 32 - 30 - 2, rounded up to top of screen boundary
-    const CLIP_W = 64;
-    const CLIP_H = 64;
+    const Y_PORTHOLE_HR     = PORTHOLE_CY - 20;
+    const Y_PORTHOLE_STEPS  = PORTHOLE_CY;
 
     // Vertical layout constants (pixels from top of 176 px display)
     // Time stack: 2×40 px rows + 6 px gap = 86 px; CY_TIME is stack vertical center
@@ -391,6 +347,7 @@ class MyWatchFace extends WatchUi.WatchFace {
     function initialize() {
         WatchFace.initialize();
         timer = new Timer.Timer();
+        ClockDigits.init();
         iconHeart = WatchUi.loadResource(Rez.Drawables.icon_heart) as BitmapResource;
         iconSteps = WatchUi.loadResource(Rez.Drawables.icon_steps) as BitmapResource;
     }
@@ -437,34 +394,11 @@ class MyWatchFace extends WatchUi.WatchFace {
 
         updateActivityData();
         refreshCachedHeartRate();
-        lastHrPartialFetchTime = Time.now().value();
         WatchUi.requestUpdate();
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // 1Hz Partial Update Lifecycle Window
-    // ─────────────────────────────────────────────────────────────────────────
-
-    function onPartialUpdate(getDc) {
-        updateActivityData();
-        var now = Time.now().value();
-        if ((now - lastHrPartialFetchTime) >= HR_PARTIAL_UPDATE_INTERVAL) {
-            refreshCachedHeartRate();
-            lastHrPartialFetchTime = now;
-        }
-
-        getDc.setClip(CLIP_X, CLIP_Y, CLIP_W, CLIP_H);
-
-        getDc.setColor(Graphics.COLOR_BLACK, Graphics.COLOR_BLACK);
-        getDc.fillRectangle(CLIP_X, CLIP_Y, CLIP_W, CLIP_H);
-
-        drawPortholeContents(getDc);
-
-        getDc.clearClip();
-    }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // Main draw (Full screen redraw executed on the minute boundary)
+    // Main draw (once per minute via onMinuteUiTick)
     // ─────────────────────────────────────────────────────────────────────────
 
     function onUpdate(dc) {
@@ -490,12 +424,12 @@ class MyWatchFace extends WatchUi.WatchFace {
         var minStr  = parts[:min] as String;
         var cx      = dc.getWidth() / 2 + TIME_CX_OFFSET;
 
-        PolyTimeDigits.drawStacked24h(dc, hourStr, minStr, cx, CY_TIME, TIME_STACK_GAP);
+        ClockDigits.drawStacked24h(dc, hourStr, minStr, cx, CY_TIME, TIME_STACK_GAP);
     }
 
     function getMinuteRowCenterY() as Number {
-        var rowH   = PolyTimeDigits.digitHeight();
-        var totalH = PolyTimeDigits.stackHeight(TIME_STACK_GAP);
+        var rowH   = ClockDigits.digitHeight();
+        var totalH = ClockDigits.stackHeight(TIME_STACK_GAP);
         var hourY  = CY_TIME - totalH / 2;
         var minY   = hourY + rowH + TIME_STACK_GAP;
         return minY + rowH / 2;
@@ -568,7 +502,7 @@ class MyWatchFace extends WatchUi.WatchFace {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // ③ Porthole Frame & Contents (1Hz Target Zone)
+    // ③ Porthole frame & contents
     // ─────────────────────────────────────────────────────────────────────────
 
     function drawPortholeFrame(dc) {
@@ -599,10 +533,6 @@ class MyWatchFace extends WatchUi.WatchFace {
     }
 
     function drawPortholeContents(dc) {
-        if (dc has :setClip) {
-            drawPortholeFrame(dc);
-        }
-
         drawPortholeMetric(dc, PORTHOLE_CX, Y_PORTHOLE_HR, iconHeart, cachedHrDisplay);
         drawPortholeMetric(dc, PORTHOLE_CX, Y_PORTHOLE_STEPS, iconSteps, cachedSteps.toString());
     }

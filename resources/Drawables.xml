@@ -6,4 +6,14 @@
    <bitmap id="weather_storm" filename="images/weather_storm.png" />
    <bitmap id="icon_heart" filename="images/icon_heart.png" />
    <bitmap id="icon_steps" filename="images/icon_steps.png" />
+   <bitmap id="digit_0" filename="images/digit_0.png" />
+   <bitmap id="digit_1" filename="images/digit_1.png" />
+   <bitmap id="digit_2" filename="images/digit_2.png" />
+   <bitmap id="digit_3" filename="images/digit_3.png" />
+   <bitmap id="digit_4" filename="images/digit_4.png" />
+   <bitmap id="digit_5" filename="images/digit_5.png" />
+   <bitmap id="digit_6" filename="images/digit_6.png" />
+   <bitmap id="digit_7" filename="images/digit_7.png" />
+   <bitmap id="digit_8" filename="images/digit_8.png" />
+   <bitmap id="digit_9" filename="images/digit_9.png" />
 </resources>
