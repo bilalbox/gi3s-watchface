@@ -36,13 +36,13 @@ A Connect IQ watch face for the **Garmin Instinct 3 Solar 45mm** with stacked cu
 
 ### Weather (upper-left)
 
-- 24×24 vector condition icon + temperature in °C
+- 24×24 **1-bit PNG sprites** (sun / cloud / rain / storm) + temperature in °C
 - Refreshed at most every **15 minutes**
 
 ### Activity porthole (upper-right)
 
-- **Steps** — top line (`NNNs`), 1 Hz partial updates
-- **Heart rate** — bottom line (`NNh`), partial updates every **5 seconds**
+- **Heart rate** — heart icon + value (upper porthole, partial updates every **5 seconds**)
+- **Steps** — 12×12 shoeprint icon + count (porthole vertical center, 1 Hz partial updates)
 - Only the 64×64 px clip region is redrawn at 1 Hz; the rest of the face updates once per minute
 
 ### Battery bar
@@ -65,10 +65,13 @@ A Connect IQ watch face for the **Garmin Instinct 3 Solar 45mm** with stacked cu
 
 | Module | Purpose |
 |--------|---------|
-| `MiniVectorIcons` | 24×24 vector weather icons |
 | `PolyTimeDigits` | Block-outline poly-path digit renderer |
 | `HijriHelpers` | Hijri calendar + date label helpers |
 | `TimeHelpers` | Hour/minute formatting for stacked time |
+
+Weather icons are 24×24 PNGs in [`resources/images/`](resources/images/) (regenerate via [`scripts/generate-weather-icons.ps1`](scripts/generate-weather-icons.ps1)).
+
+Porthole metric icons (`icon_heart.png` 10×10, `icon_steps.png` 12×12) regenerate via [`scripts/generate-porthole-icons.ps1`](scripts/generate-porthole-icons.ps1).
 
 ## Permissions
 

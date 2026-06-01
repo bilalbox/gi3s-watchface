@@ -1,3 +1,9 @@
 <resources>
    <bitmap id="launcher" filename="images/launcher.png" />
+   <bitmap id="weather_sun" filename="images/weather_sun.png" />
+   <bitmap id="weather_cloud" filename="images/weather_cloud.png" />
+   <bitmap id="weather_rain" filename="images/weather_rain.png" />
+   <bitmap id="weather_storm" filename="images/weather_storm.png" />
+   <bitmap id="icon_heart" filename="images/icon_heart.png" />
+   <bitmap id="icon_steps" filename="images/icon_steps.png" />
 </resources>

@@ -2,8 +2,8 @@
 // MyWatchFace.mc  –  Garmin Instinct 2X / 3 Solar Optimized
 //
 // Layout (top → bottom):
-//   Upper-left    │  [24x24 Weather Icon] + temperature (y≈0) inline using FONT_SMALL
-//   Porthole ring │  cx=143 cy=32 r=30  →  steps (top, 1Hz)  ·  HR (bottom, 1Hz)
+//   Upper-left    │  [24x24 Weather PNG] + temperature (y≈0) inline using FONT_SMALL
+//   Porthole ring │  cx=143 cy=32 r=30  →  HR (top)  ·  steps (center, 1Hz)
 //   ─────────────────────────────────────────────────────────────────────────
 //   TIME          │  stacked HH/MM, block-outline poly-path digits, cy≈76
 //   DOW           │  "SUN" etc · FONT_XTINY · under porthole · inline w/ minutes
@@ -25,66 +25,6 @@ import Toybox.SensorHistory;
 import Toybox.Timer;
 import Toybox.Math;
 using Toybox.Time;
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Custom 24x24 Vector Weather Icons (Scaled for FONT_SMALL)
-// ─────────────────────────────────────────────────────────────────────────────
-module MiniVectorIcons {
-
-    // Upgraded 24x24 Sun (Center anchor at 12,12)
-    function drawSun24(dc, x, y) {
-        dc.setPenWidth(2); // Thickened lines to match FONT_SMALL
-        dc.drawCircle(x + 12, y + 12, 6); // Sun core
-
-        dc.setPenWidth(1);
-        // Cardinal rays
-        dc.drawLine(x + 12, y + 1,  x + 12, y + 4);  // Top
-        dc.drawLine(x + 12, y + 20, x + 12, y + 23); // Bottom
-        dc.drawLine(x + 1,  y + 12, x + 4,  y + 12); // Left
-        dc.drawLine(x + 20, y + 12, x + 23, y + 12); // Right
-
-        // Intercardinal rays
-        dc.drawLine(x + 5,  y + 5,  x + 7,  y + 7);   // Top-Left
-        dc.drawLine(x + 19, y + 5,  x + 17, y + 7);   // Top-Right
-        dc.drawLine(x + 5,  y + 19, x + 7,  y + 17);  // Bottom-Left
-        dc.drawLine(x + 19, y + 19, x + 17, y + 17);  // Bottom-Right
-    }
-
-    // Upgraded 24x24 Cloud path structure
-    function drawCloud24(dc, x, y) {
-        dc.setPenWidth(2);
-        dc.drawCircle(x + 6,  y + 15, 4);
-        dc.drawCircle(x + 12, y + 9,  6);
-        dc.drawCircle(x + 18, y + 14, 4);
-
-        // Wipe internal overlaps with a solid fill block
-        dc.setColor(Graphics.COLOR_BLACK, Graphics.COLOR_TRANSPARENT);
-        dc.fillRectangle(x + 5, y + 11, 14, 8);
-        dc.fillRectangle(x + 9, y + 8,  6,  6);
-
-        // Main bottom foundation frame baseline
-        dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-        dc.setPenWidth(2);
-        dc.drawLine(x + 6, y + 19, x + 18, y + 19);
-    }
-
-    // Upgraded 24x24 Cloud + Rain drops
-    function drawRain24(dc, x, y) {
-        drawCloud24(dc, x, y);
-        dc.setPenWidth(1);
-        dc.drawLine(x + 9,  y + 20, x + 8,  y + 23);
-        dc.drawLine(x + 14, y + 20, x + 13, y + 23);
-    }
-
-    // Upgraded 24x24 Cloud + Lightning strike path
-    function drawLightning24(dc, x, y) {
-        drawCloud24(dc, x, y);
-        dc.setPenWidth(1);
-        dc.drawLine(x + 12, y + 19, x + 9,  y + 22);
-        dc.drawLine(x + 9,  y + 22, x + 13, y + 22);
-        dc.drawLine(x + 13, y + 22, x + 10, y + 25);
-    }
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Poly-path time digits (hand-coded, no system font)
@@ -421,11 +361,16 @@ class MyWatchFace extends WatchUi.WatchFace {
     var cachedSteps = 0;
 
     var cachedGregorianInfo = null;
+    var iconHeart = null;
+    var iconSteps = null;
 
     // Porthole geometry
     const PORTHOLE_CX = 143;
-    const PORTHOLE_CY = 32;
+    const PORTHOLE_CY = 40;
     const PORTHOLE_R  = 30;
+    const PORTHOLE_ICON_GAP = 2;
+    const Y_PORTHOLE_HR     = PORTHOLE_CY - 20; // upper porthole (above prior steps row)
+    const Y_PORTHOLE_STEPS  = PORTHOLE_CY;      // vertical center — widest chord for long counts
 
     // Bounding Box Clipping Region for 1Hz Partial Updates inside the Porthole
     const CLIP_X = 111; // 143 - 30 - 2
@@ -446,6 +391,8 @@ class MyWatchFace extends WatchUi.WatchFace {
     function initialize() {
         WatchFace.initialize();
         timer = new Timer.Timer();
+        iconHeart = WatchUi.loadResource(Rez.Drawables.icon_heart) as BitmapResource;
+        iconSteps = WatchUi.loadResource(Rez.Drawables.icon_steps) as BitmapResource;
     }
 
     function onShow() {
@@ -526,7 +473,7 @@ class MyWatchFace extends WatchUi.WatchFace {
 
         drawTime(dc);          // ① large centered time digits
         drawWeekdayByPorthole(dc); // ①b DOW inline with minutes, under porthole
-        drawUpperLeftWeather(dc); // ② Inline 24x24 Weather Vector Icon + FONT_SMALL Temp
+        drawUpperLeftWeather(dc); // ② 24x24 weather PNG + FONT_SMALL temp
         drawPortholeFrame(dc); // ③ ring base layout
         drawPortholeContents(dc); // Draws dynamic fields inside the ring
         drawCenterDates(dc);   // ④ hijri · gregorian (below time)
@@ -569,8 +516,32 @@ class MyWatchFace extends WatchUi.WatchFace {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // ② Upper Left Corner — Inline 24x24 Weather Vector Icon & FONT_SMALL Temp
+    // ② Upper Left Corner — 24x24 weather PNG + FONT_SMALL temp
     // ─────────────────────────────────────────────────────────────────────────
+
+    function getWeatherIconResource(conditionCode as Number) as ResourceId {
+        switch (conditionCode) {
+            case 0:  // CLEAR
+            case 23: // MOSTLY_CLEAR
+                return Rez.Drawables.weather_sun;
+
+            case 3:  // RAIN
+            case 11: // SCATTERED_SHOWERS
+            case 14: // LIGHT_RAIN
+            case 15: // HEAVY_RAIN
+            case 25: // LIGHT_SHOWERS
+            case 26: // SHOWERS
+            case 27: // HEAVY_SHOWERS
+                return Rez.Drawables.weather_rain;
+
+            case 6:  // THUNDERSTORMS
+            case 12: // SCATTERED_THUNDERSTORMS
+                return Rez.Drawables.weather_storm;
+
+            default:
+                return Rez.Drawables.weather_cloud;
+        }
+    }
 
     function drawUpperLeftWeather(dc) {
         var tempStr = "--\u00B0C";
@@ -586,45 +557,12 @@ class MyWatchFace extends WatchUi.WatchFace {
         }
 
         var iconX = 34;
-        var iconY = 2; // Set to absolute upper boundary to clear space for FONT_SMALL height
+        var iconY = 2;
+
+        var icon = WatchUi.loadResource(getWeatherIconResource(conditionCode)) as BitmapResource;
+        dc.drawBitmap(iconX, iconY, icon);
 
         dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-
-        switch (conditionCode) {
-            case 0:  // CLEAR
-            case 23: // MOSTLY_CLEAR
-                MiniVectorIcons.drawSun24(dc, iconX, iconY);
-                break;
-
-            case 1:  // PARTLY_CLOUDY
-            case 2:  // MOSTLY_CLOUDY
-            case 20: // CLOUDY
-            case 22: // PARTLY_CLOUDY_NIGHT
-            case 24: // MOSTLY_CLEAR_NIGHT
-                MiniVectorIcons.drawCloud24(dc, iconX, iconY);
-                break;
-
-            case 3:  // RAIN
-            case 11: // SCATTERED_SHOWERS
-            case 14: // LIGHT_RAIN
-            case 15: // HEAVY_RAIN
-            case 25: // LIGHT_SHOWERS
-            case 26: // SHOWERS
-            case 27: // HEAVY_SHOWERS
-                MiniVectorIcons.drawRain24(dc, iconX, iconY);
-                break;
-
-            case 6:  // THUNDERSTORMS
-            case 12: // SCATTERED_THUNDERSTORMS
-                MiniVectorIcons.drawLightning24(dc, iconX, iconY);
-                break;
-
-            default:
-                MiniVectorIcons.drawCloud24(dc, iconX, iconY);
-                break;
-        }
-
-        // Horizontal tracker slides exactly 24 pixels + inline padding wide
         var textX = iconX + 24 + 4;
         dc.drawText(textX, 2, Graphics.FONT_SMALL, tempStr, Graphics.TEXT_JUSTIFY_LEFT);
     }
@@ -640,25 +578,33 @@ class MyWatchFace extends WatchUi.WatchFace {
                    Graphics.ARC_CLOCKWISE, 90, 91);
     }
 
+    function drawPortholeMetric(dc, cx, y, icon as BitmapResource, valueStr as String) as Void {
+        var iconW  = icon.getWidth();
+        var iconH  = icon.getHeight();
+        var dims   = dc.getTextDimensions(valueStr, Graphics.FONT_XTINY);
+        var textW  = dims[0];
+        var totalW = iconW + PORTHOLE_ICON_GAP + textW;
+        var leftX  = cx - totalW / 2;
+        var iconY  = y - iconH / 2;
+
+        dc.drawBitmap(leftX, iconY, icon);
+        dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(
+            leftX + iconW + PORTHOLE_ICON_GAP,
+            y,
+            Graphics.FONT_XTINY,
+            valueStr,
+            Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER
+        );
+    }
+
     function drawPortholeContents(dc) {
         if (dc has :setClip) {
             drawPortholeFrame(dc);
         }
 
-        var stepsStr = cachedSteps.toString();
-        var hrStr    = cachedHrDisplay;
-
-        dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-
-        // Top Line: High-Speed Step Count
-        dc.drawText(PORTHOLE_CX, PORTHOLE_CY - 22,
-                    Graphics.FONT_XTINY, stepsStr + "s",
-                    Graphics.TEXT_JUSTIFY_CENTER);
-
-        // Bottom Line: Live Sub-Second Heart Rate Tracker
-        dc.drawText(PORTHOLE_CX, PORTHOLE_CY - 2,
-                    Graphics.FONT_XTINY, hrStr + "h",
-                    Graphics.TEXT_JUSTIFY_CENTER);
+        drawPortholeMetric(dc, PORTHOLE_CX, Y_PORTHOLE_HR, iconHeart, cachedHrDisplay);
+        drawPortholeMetric(dc, PORTHOLE_CX, Y_PORTHOLE_STEPS, iconSteps, cachedSteps.toString());
     }
 
     // ─────────────────────────────────────────────────────────────────────────
