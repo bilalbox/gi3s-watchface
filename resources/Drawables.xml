@@ -32,4 +32,18 @@
    <bitmap id="digit_7_light" filename="images/digit_7_light.png" />
    <bitmap id="digit_8_light" filename="images/digit_8_light.png" />
    <bitmap id="digit_9_light" filename="images/digit_9_light.png" />
+   <bitmap id="weekday_sun" filename="images/weekday_sun.png" />
+   <bitmap id="weekday_mon" filename="images/weekday_mon.png" />
+   <bitmap id="weekday_tue" filename="images/weekday_tue.png" />
+   <bitmap id="weekday_wed" filename="images/weekday_wed.png" />
+   <bitmap id="weekday_thu" filename="images/weekday_thu.png" />
+   <bitmap id="weekday_fri" filename="images/weekday_fri.png" />
+   <bitmap id="weekday_sat" filename="images/weekday_sat.png" />
+   <bitmap id="weekday_sun_light" filename="images/weekday_sun_light.png" />
+   <bitmap id="weekday_mon_light" filename="images/weekday_mon_light.png" />
+   <bitmap id="weekday_tue_light" filename="images/weekday_tue_light.png" />
+   <bitmap id="weekday_wed_light" filename="images/weekday_wed_light.png" />
+   <bitmap id="weekday_thu_light" filename="images/weekday_thu_light.png" />
+   <bitmap id="weekday_fri_light" filename="images/weekday_fri_light.png" />
+   <bitmap id="weekday_sat_light" filename="images/weekday_sat_light.png" />
 </resources>

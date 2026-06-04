@@ -6,7 +6,7 @@
 //   Porthole ring │  cx=143 cy=40 r=30  →  HR (top)  ·  steps (center)
 //   ─────────────────────────────────────────────────────────────────────────
 //   TIME          │  stacked HH/MM, Source Code Pro Bold bitmap digits (28×40), cy≈76
-//   DOW           │  "SUN" etc · FONT_XTINY · under porthole · inline w/ minutes
+//   DOW           │  "SUN" etc · Black Ops One bitmap (~72×37) · under porthole · inline w/ minutes
 //   Hijri date    │  "DD MONTHNAME YYYY"  (month ≤ 7 chars)  centered
 //   Gregorian     │  "DD MMM YYYY"  centered
 //   ─────────────────────────────────────────────────────────────────────────
@@ -61,11 +61,11 @@ module Theme {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Clock digits — per-digit Source Code Pro Bold bitmap sprites (28×40 px)
+// Clock digits — per-digit Source Code Pro Bold bitmap sprites (36×48 px)
 // ─────────────────────────────────────────────────────────────────────────────
 module ClockDigits {
 
-    const GAP = 4;   // px between digit cells
+    const GAP = 2;   // px between digit cells
 
     var cachedColorMode = -1;
 
@@ -217,6 +217,93 @@ module ClockDigits {
 
         drawText(dc, hourStr, cx, hourY);
         drawText(dc, minStr, cx, minY);
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Weekday labels — Black Ops One 3-letter sprites (44×24 px), Garmin DOW 1–7
+// ─────────────────────────────────────────────────────────────────────────────
+module WeekdaySprites {
+
+    var cachedColorMode = -1;
+
+    var weekdaySun = null;
+    var weekdayMon = null;
+    var weekdayTue = null;
+    var weekdayWed = null;
+    var weekdayThu = null;
+    var weekdayFri = null;
+    var weekdaySat = null;
+
+    function loadDay(dayOfWeek as Number, mode as Number) as BitmapResource or Null {
+        switch (dayOfWeek) {
+            case 1:
+                return WatchUi.loadResource(
+                    Theme.pickResource(Rez.Drawables.weekday_sun, Rez.Drawables.weekday_sun_light, mode)
+                ) as BitmapResource;
+            case 2:
+                return WatchUi.loadResource(
+                    Theme.pickResource(Rez.Drawables.weekday_mon, Rez.Drawables.weekday_mon_light, mode)
+                ) as BitmapResource;
+            case 3:
+                return WatchUi.loadResource(
+                    Theme.pickResource(Rez.Drawables.weekday_tue, Rez.Drawables.weekday_tue_light, mode)
+                ) as BitmapResource;
+            case 4:
+                return WatchUi.loadResource(
+                    Theme.pickResource(Rez.Drawables.weekday_wed, Rez.Drawables.weekday_wed_light, mode)
+                ) as BitmapResource;
+            case 5:
+                return WatchUi.loadResource(
+                    Theme.pickResource(Rez.Drawables.weekday_thu, Rez.Drawables.weekday_thu_light, mode)
+                ) as BitmapResource;
+            case 6:
+                return WatchUi.loadResource(
+                    Theme.pickResource(Rez.Drawables.weekday_fri, Rez.Drawables.weekday_fri_light, mode)
+                ) as BitmapResource;
+            case 7:
+                return WatchUi.loadResource(
+                    Theme.pickResource(Rez.Drawables.weekday_sat, Rez.Drawables.weekday_sat_light, mode)
+                ) as BitmapResource;
+        }
+        return null;
+    }
+
+    function ensure(mode as Number) as Void {
+        if (weekdaySun != null && cachedColorMode == mode) {
+            return;
+        }
+        cachedColorMode = mode;
+        weekdaySun = loadDay(1, mode);
+        weekdayMon = loadDay(2, mode);
+        weekdayTue = loadDay(3, mode);
+        weekdayWed = loadDay(4, mode);
+        weekdayThu = loadDay(5, mode);
+        weekdayFri = loadDay(6, mode);
+        weekdaySat = loadDay(7, mode);
+    }
+
+    function bitmapForDay(dayOfWeek as Number) as BitmapResource or Null {
+        switch (dayOfWeek) {
+            case 1: return weekdaySun;
+            case 2: return weekdayMon;
+            case 3: return weekdayTue;
+            case 4: return weekdayWed;
+            case 5: return weekdayThu;
+            case 6: return weekdayFri;
+            case 7: return weekdaySat;
+        }
+        return null;
+    }
+
+    function drawCentered(dc, dayOfWeek as Number, cx as Number, cy as Number) as Void {
+        var bmp = bitmapForDay(dayOfWeek);
+        if (bmp == null) {
+            return;
+        }
+        var w = bmp.getWidth();
+        var h = bmp.getHeight();
+        dc.drawBitmap(cx - w / 2, cy - h / 2, bmp);
     }
 }
 
@@ -471,10 +558,10 @@ class MyWatchFace extends WatchUi.WatchFace {
     const Y_PORTHOLE_STEPS  = PORTHOLE_CY;
 
     // Vertical layout constants (pixels from top of 176 px display)
-    // Time stack: 2×40 px rows + 6 px gap = 86 px; CY_TIME is stack vertical center
+    // Time stack: 2×40 px rows + 4 px gap = 86 px; CY_TIME is stack vertical center
     const CY_TIME         = 76;    // +10 px up from prior anchor (86)
-    const TIME_STACK_GAP  = 6;
-    const TIME_CX_OFFSET  = -20;   // +10 px further left from prior nudge (-10)
+    const TIME_STACK_GAP  = 4;
+    const TIME_CX_OFFSET  = -32;   // +10 px further left from prior nudge (-10)
     const Y_HIJRI         = 128;
     const Y_GREGORIAN     = 148;
     const Y_BATTERY_BAR = 172;
@@ -499,6 +586,7 @@ class MyWatchFace extends WatchUi.WatchFace {
 
     function ensureThemeAssets(mode as Number) as Void {
         ClockDigits.ensure(mode);
+        WeekdaySprites.ensure(mode);
         if (loadedAssetColorMode != mode) {
             reloadThemedBitmaps(mode);
         }
@@ -565,7 +653,7 @@ class MyWatchFace extends WatchUi.WatchFace {
         dc.setColor(fg, Graphics.COLOR_TRANSPARENT);
 
         drawTime(dc);
-        drawWeekdayByPorthole(dc, fg);
+        drawWeekdayByPorthole(dc);
         drawUpperLeftWeather(dc, mode, fg);
         drawPortholeFrame(dc, accent);
         drawPortholeContents(dc, fg);
@@ -594,18 +682,11 @@ class MyWatchFace extends WatchUi.WatchFace {
         return minY + rowH / 2;
     }
 
-    function drawWeekdayByPorthole(dc, fg as Number) {
+    function drawWeekdayByPorthole(dc) {
         var g = cachedGregorianInfo;
         if (g == null) { g = Gregorian.info(Time.now(), Time.FORMAT_SHORT); }
 
-        dc.setColor(fg, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(
-            PORTHOLE_CX,
-            getMinuteRowCenterY(),
-            Graphics.FONT_XTINY,
-            HijriHelpers.weekdayAbbr(g.day_of_week),
-            Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER
-        );
+        WeekdaySprites.drawCentered(dc, g.day_of_week, PORTHOLE_CX, getMinuteRowCenterY());
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -669,7 +750,7 @@ class MyWatchFace extends WatchUi.WatchFace {
             }
         }
 
-        var iconX = 34;
+        var iconX = 30;
         var iconY = 2;
 
         var icon = getCachedWeatherIcon(conditionCode, mode);

@@ -2,10 +2,10 @@
 # Writes white-on-transparent (dark theme) and black-on-transparent (_light suffix).
 Add-Type -AssemblyName System.Drawing
 
-$fontPath = Join-Path $PSScriptRoot "fonts\SourceCodePro-Bold.ttf"
+$fontPath = Join-Path $PSScriptRoot "fonts\BlackOpsOne-Regular.ttf"
 $outDir   = Join-Path $PSScriptRoot "..\resources\images"
-$cellW    = 28
-$cellH    = 40
+$cellW    = 36
+$cellH    = 48
 
 if (-not (Test-Path $fontPath)) {
     Write-Error "Missing font: $fontPath"
@@ -35,7 +35,7 @@ function Binarize-Bitmap($bmp, $ink) {
 }
 
 function Find-FontSize($family, [int]$w, [int]$h, $ink) {
-    $size = 42.0
+    $size = 48.0
     while ($size -ge 18) {
         $font = New-Object System.Drawing.Font($family, $size, $style, [System.Drawing.GraphicsUnit]::Pixel)
         $test = New-Object System.Drawing.Bitmap $w, $h, ([System.Drawing.Imaging.PixelFormat]::Format32bppArgb)

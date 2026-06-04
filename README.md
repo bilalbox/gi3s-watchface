@@ -31,7 +31,7 @@ A Connect IQ watch face for the **Garmin Instinct 3 Solar 45mm** with stacked So
 
 - **Hijri** — `DD MONTHNAME YYYY` (e.g. `15 DHU HIJ 1447`)
 - **Gregorian** — `DD MMM YYYY` (e.g. `31 MAY 2026`)
-- **Weekday** — `SUN` / `MON` / … in `FONT_XTINY`, under the porthole, vertically aligned with the minutes row
+- **Weekday** — `SUN` / `MON` / `THU` / … as Black Ops One bitmaps (24 px font, auto-sized cell), under the porthole, aligned with the minutes row
 - **Hijri offset** — configurable ±2 days (Settings → Hijri date shift)
 - **Color theme** — dark (default) or light background with matching text and bitmap ink
 
@@ -67,11 +67,14 @@ All UI updates run on a **single 60-second timer** — no sub-minute partial red
 | Module | Purpose |
 |--------|---------|
 | `Theme` | `colorMode` property, palette colors, dark/light resource selection |
-| `ClockDigits` | Source Code Pro Bold per-digit bitmap renderer for stacked time |
+| `ClockDigits` | Black Ops One per-digit bitmap renderer for stacked time |
+| `WeekdaySprites` | Black Ops One 3-letter weekday bitmaps (Garmin DOW 1–7) |
 | `HijriHelpers` | Hijri calendar + date label helpers |
 | `TimeHelpers` | Hour/minute formatting for stacked time |
 
-Clock digit sprites (`digit_0.png` … `digit_9.png`, 28×40, plus `*_light.png` for light theme) regenerate via [`scripts/generate-clock-digits.ps1`](scripts/generate-clock-digits.ps1) using [Source Code Pro Bold](https://fonts.google.com/specimen/Source+Code+Pro) (SIL OFL).
+Clock digit sprites (`digit_0.png` … `digit_9.png`, 36×48, plus `*_light.png` for light theme) regenerate via [`scripts/generate-clock-digits.ps1`](scripts/generate-clock-digits.ps1) using [Black Ops One](https://fonts.google.com/specimen/Black+Ops+One) (OFL).
+
+Weekday sprites (`weekday_sun.png` … `weekday_sat.png`, plus `*_light.png`) regenerate via [`scripts/generate-weekday-sprites.ps1`](scripts/generate-weekday-sprites.ps1) (same font, 24 px, 3-letter labels; cell width fits `WED`/`MON`).
 
 Weather icons are 24×24 PNGs in [`resources/images/`](resources/images/) (regenerate via [`scripts/generate-weather-icons.ps1`](scripts/generate-weather-icons.ps1); each icon has a `_light` variant).
 
