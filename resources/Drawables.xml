@@ -4,8 +4,14 @@
    <bitmap id="weather_cloud" filename="images/weather_cloud.png" />
    <bitmap id="weather_rain" filename="images/weather_rain.png" />
    <bitmap id="weather_storm" filename="images/weather_storm.png" />
+   <bitmap id="weather_sun_light" filename="images/weather_sun_light.png" />
+   <bitmap id="weather_cloud_light" filename="images/weather_cloud_light.png" />
+   <bitmap id="weather_rain_light" filename="images/weather_rain_light.png" />
+   <bitmap id="weather_storm_light" filename="images/weather_storm_light.png" />
    <bitmap id="icon_heart" filename="images/icon_heart.png" />
    <bitmap id="icon_steps" filename="images/icon_steps.png" />
+   <bitmap id="icon_heart_light" filename="images/icon_heart_light.png" />
+   <bitmap id="icon_steps_light" filename="images/icon_steps_light.png" />
    <bitmap id="digit_0" filename="images/digit_0.png" />
    <bitmap id="digit_1" filename="images/digit_1.png" />
    <bitmap id="digit_2" filename="images/digit_2.png" />
@@ -16,4 +22,14 @@
    <bitmap id="digit_7" filename="images/digit_7.png" />
    <bitmap id="digit_8" filename="images/digit_8.png" />
    <bitmap id="digit_9" filename="images/digit_9.png" />
+   <bitmap id="digit_0_light" filename="images/digit_0_light.png" />
+   <bitmap id="digit_1_light" filename="images/digit_1_light.png" />
+   <bitmap id="digit_2_light" filename="images/digit_2_light.png" />
+   <bitmap id="digit_3_light" filename="images/digit_3_light.png" />
+   <bitmap id="digit_4_light" filename="images/digit_4_light.png" />
+   <bitmap id="digit_5_light" filename="images/digit_5_light.png" />
+   <bitmap id="digit_6_light" filename="images/digit_6_light.png" />
+   <bitmap id="digit_7_light" filename="images/digit_7_light.png" />
+   <bitmap id="digit_8_light" filename="images/digit_8_light.png" />
+   <bitmap id="digit_9_light" filename="images/digit_9_light.png" />
 </resources>

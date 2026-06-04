@@ -33,6 +33,7 @@ A Connect IQ watch face for the **Garmin Instinct 3 Solar 45mm** with stacked So
 - **Gregorian** — `DD MMM YYYY` (e.g. `31 MAY 2026`)
 - **Weekday** — `SUN` / `MON` / … in `FONT_XTINY`, under the porthole, vertically aligned with the minutes row
 - **Hijri offset** — configurable ±2 days (Settings → Hijri date shift)
+- **Color theme** — dark (default) or light background with matching text and bitmap ink
 
 ### Weather (upper-left)
 
@@ -65,15 +66,25 @@ All UI updates run on a **single 60-second timer** — no sub-minute partial red
 
 | Module | Purpose |
 |--------|---------|
+| `Theme` | `colorMode` property, palette colors, dark/light resource selection |
 | `ClockDigits` | Source Code Pro Bold per-digit bitmap renderer for stacked time |
 | `HijriHelpers` | Hijri calendar + date label helpers |
 | `TimeHelpers` | Hour/minute formatting for stacked time |
 
-Clock digit sprites (`digit_0.png` … `digit_9.png`, 28×40) regenerate via [`scripts/generate-clock-digits.ps1`](scripts/generate-clock-digits.ps1) using [Source Code Pro Bold](https://fonts.google.com/specimen/Source+Code+Pro) (SIL OFL).
+Clock digit sprites (`digit_0.png` … `digit_9.png`, 28×40, plus `*_light.png` for light theme) regenerate via [`scripts/generate-clock-digits.ps1`](scripts/generate-clock-digits.ps1) using [Source Code Pro Bold](https://fonts.google.com/specimen/Source+Code+Pro) (SIL OFL).
 
-Weather icons are 24×24 PNGs in [`resources/images/`](resources/images/) (regenerate via [`scripts/generate-weather-icons.ps1`](scripts/generate-weather-icons.ps1)).
+Weather icons are 24×24 PNGs in [`resources/images/`](resources/images/) (regenerate via [`scripts/generate-weather-icons.ps1`](scripts/generate-weather-icons.ps1); each icon has a `_light` variant).
 
-Porthole metric icons (`icon_heart.png` 10×10, `icon_steps.png` 12×12) regenerate via [`scripts/generate-porthole-icons.ps1`](scripts/generate-porthole-icons.ps1).
+Porthole metric icons (`icon_heart.png` 10×10, `icon_steps.png` 12×12, plus `_light` variants) regenerate via [`scripts/generate-porthole-icons.ps1`](scripts/generate-porthole-icons.ps1).
+
+## Settings
+
+| Where | What |
+|-------|------|
+| On watch | Long-press **UP** → Customize → **Watch face settings** → Hijri date shift or Color theme |
+| Garmin Connect / Express | App settings: Hijri date adjustment, Color theme (dark / light list) |
+
+Default theme is **dark** (unchanged look for existing installs).
 
 ## Permissions
 

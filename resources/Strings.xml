@@ -1,6 +1,7 @@
 <resources xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://developer.garmin.com/downloads/connect-iq/resources.xsd">
   <properties>
     <property id="hijriDayOffset" type="number">0</property>
+    <property id="colorMode" type="number">0</property>
   </properties>
 
   <strings>
@@ -8,11 +9,21 @@
     <string id="hijri_offset_title">Hijri date adjustment</string>
     <string id="hijri_offset_prompt">Days to shift the tabular Hijri date for local moon sighting (from -2 to +2).</string>
     <string id="hijri_offset_error">Enter a whole number from -2 to 2.</string>
+    <string id="theme_title">Color theme</string>
+    <string id="theme_prompt">Choose dark or light appearance for the watch face.</string>
+    <string id="theme_dark">Dark</string>
+    <string id="theme_light">Light</string>
   </strings>
 
   <settings>
     <setting propertyKey="@Properties.hijriDayOffset" title="@Strings.hijri_offset_title" prompt="@Strings.hijri_offset_prompt">
       <settingConfig type="numeric" min="-2" max="2" errorMessage="@Strings.hijri_offset_error" />
+    </setting>
+    <setting propertyKey="@Properties.colorMode" title="@Strings.theme_title" prompt="@Strings.theme_prompt">
+      <settingConfig type="list">
+        <listEntry value="0">@Strings.theme_dark</listEntry>
+        <listEntry value="1">@Strings.theme_light</listEntry>
+      </settingConfig>
     </setting>
   </settings>
 </resources>

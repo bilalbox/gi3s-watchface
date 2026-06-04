@@ -27,11 +27,47 @@ import Toybox.Math;
 using Toybox.Time;
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Color theme (property colorMode: 0 = dark, 1 = light)
+// ─────────────────────────────────────────────────────────────────────────────
+
+module Theme {
+
+    const MODE_DARK  = 0;
+    const MODE_LIGHT = 1;
+
+    function getColorMode() as Number {
+        var raw = Properties.getValue("colorMode");
+        if (raw instanceof Number && (raw as Number) == MODE_LIGHT) {
+            return MODE_LIGHT;
+        }
+        return MODE_DARK;
+    }
+
+    function pickResource(darkId, lightId, mode as Number) as ResourceId {
+        return (mode == MODE_LIGHT) ? lightId : darkId;
+    }
+
+    function backgroundForMode(mode as Number) as Number {
+        return (mode == MODE_LIGHT) ? Graphics.COLOR_WHITE : Graphics.COLOR_BLACK;
+    }
+
+    function foregroundForMode(mode as Number) as Number {
+        return (mode == MODE_LIGHT) ? Graphics.COLOR_BLACK : Graphics.COLOR_WHITE;
+    }
+
+    function accentForMode(mode as Number) as Number {
+        return (mode == MODE_LIGHT) ? Graphics.COLOR_LT_GRAY : Graphics.COLOR_DK_GRAY;
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Clock digits — per-digit Source Code Pro Bold bitmap sprites (28×40 px)
 // ─────────────────────────────────────────────────────────────────────────────
 module ClockDigits {
 
     const GAP = 4;   // px between digit cells
+
+    var cachedColorMode = -1;
 
     var digit0 = null;
     var digit1 = null;
@@ -44,18 +80,67 @@ module ClockDigits {
     var digit8 = null;
     var digit9 = null;
 
-    function init() as Void {
-        if (digit0 != null) { return; }
-        digit0 = WatchUi.loadResource(Rez.Drawables.digit_0) as BitmapResource;
-        digit1 = WatchUi.loadResource(Rez.Drawables.digit_1) as BitmapResource;
-        digit2 = WatchUi.loadResource(Rez.Drawables.digit_2) as BitmapResource;
-        digit3 = WatchUi.loadResource(Rez.Drawables.digit_3) as BitmapResource;
-        digit4 = WatchUi.loadResource(Rez.Drawables.digit_4) as BitmapResource;
-        digit5 = WatchUi.loadResource(Rez.Drawables.digit_5) as BitmapResource;
-        digit6 = WatchUi.loadResource(Rez.Drawables.digit_6) as BitmapResource;
-        digit7 = WatchUi.loadResource(Rez.Drawables.digit_7) as BitmapResource;
-        digit8 = WatchUi.loadResource(Rez.Drawables.digit_8) as BitmapResource;
-        digit9 = WatchUi.loadResource(Rez.Drawables.digit_9) as BitmapResource;
+    function loadDigit(d as Number, mode as Number) as BitmapResource {
+        switch (d) {
+            case 0:
+                return WatchUi.loadResource(
+                    Theme.pickResource(Rez.Drawables.digit_0, Rez.Drawables.digit_0_light, mode)
+                ) as BitmapResource;
+            case 1:
+                return WatchUi.loadResource(
+                    Theme.pickResource(Rez.Drawables.digit_1, Rez.Drawables.digit_1_light, mode)
+                ) as BitmapResource;
+            case 2:
+                return WatchUi.loadResource(
+                    Theme.pickResource(Rez.Drawables.digit_2, Rez.Drawables.digit_2_light, mode)
+                ) as BitmapResource;
+            case 3:
+                return WatchUi.loadResource(
+                    Theme.pickResource(Rez.Drawables.digit_3, Rez.Drawables.digit_3_light, mode)
+                ) as BitmapResource;
+            case 4:
+                return WatchUi.loadResource(
+                    Theme.pickResource(Rez.Drawables.digit_4, Rez.Drawables.digit_4_light, mode)
+                ) as BitmapResource;
+            case 5:
+                return WatchUi.loadResource(
+                    Theme.pickResource(Rez.Drawables.digit_5, Rez.Drawables.digit_5_light, mode)
+                ) as BitmapResource;
+            case 6:
+                return WatchUi.loadResource(
+                    Theme.pickResource(Rez.Drawables.digit_6, Rez.Drawables.digit_6_light, mode)
+                ) as BitmapResource;
+            case 7:
+                return WatchUi.loadResource(
+                    Theme.pickResource(Rez.Drawables.digit_7, Rez.Drawables.digit_7_light, mode)
+                ) as BitmapResource;
+            case 8:
+                return WatchUi.loadResource(
+                    Theme.pickResource(Rez.Drawables.digit_8, Rez.Drawables.digit_8_light, mode)
+                ) as BitmapResource;
+            case 9:
+                return WatchUi.loadResource(
+                    Theme.pickResource(Rez.Drawables.digit_9, Rez.Drawables.digit_9_light, mode)
+                ) as BitmapResource;
+        }
+        return digit0;
+    }
+
+    function ensure(mode as Number) as Void {
+        if (digit0 != null && cachedColorMode == mode) {
+            return;
+        }
+        cachedColorMode = mode;
+        digit0 = loadDigit(0, mode);
+        digit1 = loadDigit(1, mode);
+        digit2 = loadDigit(2, mode);
+        digit3 = loadDigit(3, mode);
+        digit4 = loadDigit(4, mode);
+        digit5 = loadDigit(5, mode);
+        digit6 = loadDigit(6, mode);
+        digit7 = loadDigit(7, mode);
+        digit8 = loadDigit(8, mode);
+        digit9 = loadDigit(9, mode);
     }
 
     function bitmapForDigit(d as Number) as BitmapResource or Null {
@@ -75,23 +160,17 @@ module ClockDigits {
     }
 
     function digitWidth() as Number {
-        init();
         return digit0.getWidth();
     }
 
     function digitHeight() as Number {
-        init();
         return digit0.getHeight();
-    }
-
-    function digitGap() as Number {
-        return GAP;
     }
 
     function measureTextWidth(text as String) as Number {
         var n = text.length();
         if (n <= 0) { return 0; }
-        return n * digitWidth() + (n - 1) * digitGap();
+        return n * digitWidth() + (n - 1) * GAP;
     }
 
     function charToDigit(ch as String) as Number {
@@ -109,10 +188,9 @@ module ClockDigits {
     }
 
     function drawText(dc, text as String, cx, yTop) as Void {
-        init();
         var totalW = measureTextWidth(text);
         var x = cx - totalW / 2;
-        var step = digitWidth() + digitGap();
+        var step = digitWidth() + GAP;
         var len  = text.length();
 
         for (var i = 0; i < len; i++) {
@@ -251,8 +329,63 @@ module TimeHelpers {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Settings menu – Hijri day offset  (-2 … +2)
+// Settings menus – root, Hijri offset, color theme
 // ─────────────────────────────────────────────────────────────────────────────
+
+class WatchfaceSettingsMenu extends WatchUi.Menu2 {
+    function initialize() {
+        Menu2.initialize({ :title => "Watch face settings" });
+        addItem(new WatchUi.MenuItem("Hijri date shift", null, 0, {}));
+        addItem(new WatchUi.MenuItem("Color theme", null, 1, {}));
+    }
+}
+
+class WatchfaceSettingsDelegate extends WatchUi.Menu2InputDelegate {
+    function initialize() {
+        Menu2InputDelegate.initialize();
+    }
+
+    function onSelect(menuItem as MenuItem) as Void {
+        var rawId = menuItem.getId();
+        if (!(rawId instanceof Number)) { return; }
+        var id = rawId as Number;
+        if (id == 0) {
+            WatchUi.pushView(
+                new HijriOffsetSettingsMenu(),
+                new HijriOffsetMenuDelegate(),
+                WatchUi.SLIDE_LEFT
+            );
+        } else if (id == 1) {
+            WatchUi.pushView(
+                new ColorThemeSettingsMenu(),
+                new ColorThemeMenuDelegate(),
+                WatchUi.SLIDE_LEFT
+            );
+        }
+    }
+}
+
+class ColorThemeSettingsMenu extends WatchUi.Menu2 {
+    function initialize() {
+        Menu2.initialize({ :title => "Color theme" });
+        addItem(new WatchUi.MenuItem("Dark", "Default", 0, {}));
+        addItem(new WatchUi.MenuItem("Light", "", 1, {}));
+    }
+}
+
+class ColorThemeMenuDelegate extends WatchUi.Menu2InputDelegate {
+    function initialize() {
+        Menu2InputDelegate.initialize();
+    }
+
+    function onSelect(menuItem as MenuItem) as Void {
+        var rawId = menuItem.getId();
+        if (!(rawId instanceof Number)) { return; }
+        Properties.setValue("colorMode", rawId as Number);
+        WatchUi.requestUpdate();
+        WatchUi.popView(WatchUi.SLIDE_IMMEDIATE);
+    }
+}
 
 class HijriOffsetSettingsMenu extends WatchUi.Menu2 {
     function initialize() {
@@ -298,7 +431,7 @@ class MyProjectApp extends Application.AppBase {
     }
 
     function getSettingsView() as [WatchUi.Views] or [WatchUi.Views, WatchUi.InputDelegates] or Null {
-        return [ new HijriOffsetSettingsMenu(), new HijriOffsetMenuDelegate() ];
+        return [ new WatchfaceSettingsMenu(), new WatchfaceSettingsDelegate() ];
     }
 }
 
@@ -325,6 +458,9 @@ class MyWatchFace extends WatchUi.WatchFace {
     var cachedGregorianInfo = null;
     var iconHeart = null;
     var iconSteps = null;
+    var cachedWeatherIcon = null;
+    var cachedWeatherKey = -1;
+    var loadedAssetColorMode = -1;
 
     // Porthole geometry
     const PORTHOLE_CX = 143;
@@ -347,9 +483,25 @@ class MyWatchFace extends WatchUi.WatchFace {
     function initialize() {
         WatchFace.initialize();
         timer = new Timer.Timer();
-        ClockDigits.init();
-        iconHeart = WatchUi.loadResource(Rez.Drawables.icon_heart) as BitmapResource;
-        iconSteps = WatchUi.loadResource(Rez.Drawables.icon_steps) as BitmapResource;
+    }
+
+    function reloadThemedBitmaps(mode as Number) as Void {
+        iconHeart = WatchUi.loadResource(
+            Theme.pickResource(Rez.Drawables.icon_heart, Rez.Drawables.icon_heart_light, mode)
+        ) as BitmapResource;
+        iconSteps = WatchUi.loadResource(
+            Theme.pickResource(Rez.Drawables.icon_steps, Rez.Drawables.icon_steps_light, mode)
+        ) as BitmapResource;
+        cachedWeatherIcon = null;
+        cachedWeatherKey = -1;
+        loadedAssetColorMode = mode;
+    }
+
+    function ensureThemeAssets(mode as Number) as Void {
+        ClockDigits.ensure(mode);
+        if (loadedAssetColorMode != mode) {
+            reloadThemedBitmaps(mode);
+        }
     }
 
     function onShow() {
@@ -402,16 +554,23 @@ class MyWatchFace extends WatchUi.WatchFace {
     // ─────────────────────────────────────────────────────────────────────────
 
     function onUpdate(dc) {
-        dc.setColor(Graphics.COLOR_BLACK, Graphics.COLOR_BLACK);
-        dc.clear();
+        var mode = Theme.getColorMode();
+        ensureThemeAssets(mode);
+        var bg = Theme.backgroundForMode(mode);
+        var fg = Theme.foregroundForMode(mode);
+        var accent = Theme.accentForMode(mode);
 
-        drawTime(dc);          // ① large centered time digits
-        drawWeekdayByPorthole(dc); // ①b DOW inline with minutes, under porthole
-        drawUpperLeftWeather(dc); // ② 24x24 weather PNG + FONT_SMALL temp
-        drawPortholeFrame(dc); // ③ ring base layout
-        drawPortholeContents(dc); // Draws dynamic fields inside the ring
-        drawCenterDates(dc);   // ④ hijri · gregorian (below time)
-        drawBatteryBar(dc);    // ⑤ thin horizontal bar at very bottom
+        dc.setColor(bg, bg);
+        dc.clear();
+        dc.setColor(fg, Graphics.COLOR_TRANSPARENT);
+
+        drawTime(dc);
+        drawWeekdayByPorthole(dc, fg);
+        drawUpperLeftWeather(dc, mode, fg);
+        drawPortholeFrame(dc, accent);
+        drawPortholeContents(dc, fg);
+        drawCenterDates(dc, fg);
+        drawBatteryBar(dc, fg, accent);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -435,11 +594,11 @@ class MyWatchFace extends WatchUi.WatchFace {
         return minY + rowH / 2;
     }
 
-    function drawWeekdayByPorthole(dc) {
+    function drawWeekdayByPorthole(dc, fg as Number) {
         var g = cachedGregorianInfo;
         if (g == null) { g = Gregorian.info(Time.now(), Time.FORMAT_SHORT); }
 
-        dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+        dc.setColor(fg, Graphics.COLOR_TRANSPARENT);
         dc.drawText(
             PORTHOLE_CX,
             getMinuteRowCenterY(),
@@ -453,11 +612,13 @@ class MyWatchFace extends WatchUi.WatchFace {
     // ② Upper Left Corner — 24x24 weather PNG + FONT_SMALL temp
     // ─────────────────────────────────────────────────────────────────────────
 
-    function getWeatherIconResource(conditionCode as Number) as ResourceId {
+    function getWeatherIconResource(conditionCode as Number, mode as Number) as ResourceId {
         switch (conditionCode) {
             case 0:  // CLEAR
             case 23: // MOSTLY_CLEAR
-                return Rez.Drawables.weather_sun;
+                return Theme.pickResource(
+                    Rez.Drawables.weather_sun, Rez.Drawables.weather_sun_light, mode
+                );
 
             case 3:  // RAIN
             case 11: // SCATTERED_SHOWERS
@@ -466,18 +627,36 @@ class MyWatchFace extends WatchUi.WatchFace {
             case 25: // LIGHT_SHOWERS
             case 26: // SHOWERS
             case 27: // HEAVY_SHOWERS
-                return Rez.Drawables.weather_rain;
+                return Theme.pickResource(
+                    Rez.Drawables.weather_rain, Rez.Drawables.weather_rain_light, mode
+                );
 
             case 6:  // THUNDERSTORMS
             case 12: // SCATTERED_THUNDERSTORMS
-                return Rez.Drawables.weather_storm;
+                return Theme.pickResource(
+                    Rez.Drawables.weather_storm, Rez.Drawables.weather_storm_light, mode
+                );
 
             default:
-                return Rez.Drawables.weather_cloud;
+                return Theme.pickResource(
+                    Rez.Drawables.weather_cloud, Rez.Drawables.weather_cloud_light, mode
+                );
         }
     }
 
-    function drawUpperLeftWeather(dc) {
+    function getCachedWeatherIcon(conditionCode as Number, mode as Number) as BitmapResource {
+        var key = mode * 1000 + conditionCode;
+        if (cachedWeatherIcon != null && cachedWeatherKey == key) {
+            return cachedWeatherIcon;
+        }
+        cachedWeatherIcon = WatchUi.loadResource(
+            getWeatherIconResource(conditionCode, mode)
+        ) as BitmapResource;
+        cachedWeatherKey = key;
+        return cachedWeatherIcon;
+    }
+
+    function drawUpperLeftWeather(dc, mode as Number, fg as Number) {
         var tempStr = "--\u00B0C";
         var conditionCode = -1;
 
@@ -493,10 +672,10 @@ class MyWatchFace extends WatchUi.WatchFace {
         var iconX = 34;
         var iconY = 2;
 
-        var icon = WatchUi.loadResource(getWeatherIconResource(conditionCode)) as BitmapResource;
+        var icon = getCachedWeatherIcon(conditionCode, mode);
         dc.drawBitmap(iconX, iconY, icon);
 
-        dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+        dc.setColor(fg, Graphics.COLOR_TRANSPARENT);
         var textX = iconX + 24 + 4;
         dc.drawText(textX, 2, Graphics.FONT_SMALL, tempStr, Graphics.TEXT_JUSTIFY_LEFT);
     }
@@ -505,14 +684,14 @@ class MyWatchFace extends WatchUi.WatchFace {
     // ③ Porthole frame & contents
     // ─────────────────────────────────────────────────────────────────────────
 
-    function drawPortholeFrame(dc) {
+    function drawPortholeFrame(dc, accent as Number) {
         dc.setPenWidth(2);
-        dc.setColor(Graphics.COLOR_DK_GRAY, Graphics.COLOR_TRANSPARENT);
+        dc.setColor(accent, Graphics.COLOR_TRANSPARENT);
         dc.drawArc(PORTHOLE_CX, PORTHOLE_CY, PORTHOLE_R,
                    Graphics.ARC_CLOCKWISE, 90, 91);
     }
 
-    function drawPortholeMetric(dc, cx, y, icon as BitmapResource, valueStr as String) as Void {
+    function drawPortholeMetric(dc, cx, y, icon as BitmapResource, valueStr as String, fg as Number) as Void {
         var iconW  = icon.getWidth();
         var iconH  = icon.getHeight();
         var dims   = dc.getTextDimensions(valueStr, Graphics.FONT_XTINY);
@@ -522,7 +701,7 @@ class MyWatchFace extends WatchUi.WatchFace {
         var iconY  = y - iconH / 2;
 
         dc.drawBitmap(leftX, iconY, icon);
-        dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+        dc.setColor(fg, Graphics.COLOR_TRANSPARENT);
         dc.drawText(
             leftX + iconW + PORTHOLE_ICON_GAP,
             y,
@@ -532,16 +711,16 @@ class MyWatchFace extends WatchUi.WatchFace {
         );
     }
 
-    function drawPortholeContents(dc) {
-        drawPortholeMetric(dc, PORTHOLE_CX, Y_PORTHOLE_HR, iconHeart, cachedHrDisplay);
-        drawPortholeMetric(dc, PORTHOLE_CX, Y_PORTHOLE_STEPS, iconSteps, cachedSteps.toString());
+    function drawPortholeContents(dc, fg as Number) {
+        drawPortholeMetric(dc, PORTHOLE_CX, Y_PORTHOLE_HR, iconHeart, cachedHrDisplay, fg);
+        drawPortholeMetric(dc, PORTHOLE_CX, Y_PORTHOLE_STEPS, iconSteps, cachedSteps.toString(), fg);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
     // ④ Center column below time
     // ─────────────────────────────────────────────────────────────────────────
 
-    function drawCenterDates(dc) {
+    function drawCenterDates(dc, fg as Number) {
         var cx = dc.getWidth() / 2;
         var g = cachedGregorianInfo;
         if (g == null) { g = Gregorian.info(Time.now(), Time.FORMAT_SHORT); }
@@ -556,7 +735,7 @@ class MyWatchFace extends WatchUi.WatchFace {
                             HijriHelpers.gregorianMonthName(g.month) + " " +
                             g.year.toString();
 
-        dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+        dc.setColor(fg, Graphics.COLOR_TRANSPARENT);
         dc.drawText(cx, Y_HIJRI,     Graphics.FONT_XTINY, hijriLine,     Graphics.TEXT_JUSTIFY_CENTER);
         dc.drawText(cx, Y_GREGORIAN, Graphics.FONT_XTINY, gregorianLine, Graphics.TEXT_JUSTIFY_CENTER);
     }
@@ -565,7 +744,7 @@ class MyWatchFace extends WatchUi.WatchFace {
     // ⑤ Battery bar
     // ─────────────────────────────────────────────────────────────────────────
 
-    function drawBatteryBar(dc) {
+    function drawBatteryBar(dc, fg as Number, accent as Number) {
         var w = dc.getWidth();
         var pct = 0.0;
         if (cachedSystemStats != null) {
@@ -573,11 +752,11 @@ class MyWatchFace extends WatchUi.WatchFace {
         }
         var fillW = (w.toFloat() * pct).toNumber();
 
-        dc.setColor(Graphics.COLOR_DK_GRAY, Graphics.COLOR_TRANSPARENT);
+        dc.setColor(accent, Graphics.COLOR_TRANSPARENT);
         dc.fillRectangle(0, Y_BATTERY_BAR, w, H_BATTERY_BAR);
 
         if (fillW > 0) {
-            dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+            dc.setColor(fg, Graphics.COLOR_TRANSPARENT);
             dc.fillRectangle(0, Y_BATTERY_BAR, fillW, H_BATTERY_BAR);
         }
     }
