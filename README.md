@@ -37,7 +37,8 @@ A Connect IQ watch face for the **Garmin Instinct 3 Solar 45mm** with stacked So
 
 ### Weather (upper-left)
 
-- 24×24 **1-bit PNG sprites** (sun / cloud / rain / storm) + temperature in °C
+- 24×24 **1-bit PNG sprites** (7 categories: clear, partly cloudy, cloudy, wind, rain, storm, snow) + temperature in °C
+- Hand-drawn pixel icons tuned for MIP readability; Garmin condition codes map to 7 buckets (fog → cloudy, wintry mix → snow, etc.)
 - Refreshed at most every **15 minutes**
 
 ### Activity porthole (upper-right)
@@ -76,7 +77,7 @@ Clock digit sprites (`digit_0.png` … `digit_9.png`, 36×48, plus `*_light.png`
 
 Weekday sprites (`weekday_sun.png` … `weekday_sat.png`, plus `*_light.png`) regenerate via [`scripts/generate-weekday-sprites.ps1`](scripts/generate-weekday-sprites.ps1) (same font, 24 px, 3-letter labels; cell width fits `WED`/`MON`).
 
-Weather icons are 24×24 PNGs in [`resources/images/`](resources/images/) (regenerate via [`scripts/generate-weather-icons.ps1`](scripts/generate-weather-icons.ps1); each icon has a `_light` variant).
+Weather icons are 24×24 hand-drawn PNGs in [`resources/images/`](resources/images/) (regenerate via [`scripts/generate-weather-icons.ps1`](scripts/generate-weather-icons.ps1); each icon has a `_light` variant).
 
 Porthole metric icons (`icon_heart.png` 10×10, `icon_steps.png` 12×12, plus `_light` variants) regenerate via [`scripts/generate-porthole-icons.ps1`](scripts/generate-porthole-icons.ps1).
 

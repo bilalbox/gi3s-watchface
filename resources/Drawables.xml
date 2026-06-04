@@ -1,13 +1,19 @@
 <resources>
    <bitmap id="launcher" filename="images/launcher.png" />
-   <bitmap id="weather_sun" filename="images/weather_sun.png" />
-   <bitmap id="weather_cloud" filename="images/weather_cloud.png" />
+   <bitmap id="weather_clear" filename="images/weather_clear.png" />
+   <bitmap id="weather_partly_cloudy" filename="images/weather_partly_cloudy.png" />
+   <bitmap id="weather_cloudy" filename="images/weather_cloudy.png" />
+   <bitmap id="weather_wind" filename="images/weather_wind.png" />
    <bitmap id="weather_rain" filename="images/weather_rain.png" />
    <bitmap id="weather_storm" filename="images/weather_storm.png" />
-   <bitmap id="weather_sun_light" filename="images/weather_sun_light.png" />
-   <bitmap id="weather_cloud_light" filename="images/weather_cloud_light.png" />
+   <bitmap id="weather_snow" filename="images/weather_snow.png" />
+   <bitmap id="weather_clear_light" filename="images/weather_clear_light.png" />
+   <bitmap id="weather_partly_cloudy_light" filename="images/weather_partly_cloudy_light.png" />
+   <bitmap id="weather_cloudy_light" filename="images/weather_cloudy_light.png" />
+   <bitmap id="weather_wind_light" filename="images/weather_wind_light.png" />
    <bitmap id="weather_rain_light" filename="images/weather_rain_light.png" />
    <bitmap id="weather_storm_light" filename="images/weather_storm_light.png" />
+   <bitmap id="weather_snow_light" filename="images/weather_snow_light.png" />
    <bitmap id="icon_heart" filename="images/icon_heart.png" />
    <bitmap id="icon_steps" filename="images/icon_steps.png" />
    <bitmap id="icon_heart_light" filename="images/icon_heart_light.png" />

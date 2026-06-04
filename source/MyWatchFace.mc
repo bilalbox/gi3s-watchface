@@ -559,7 +559,7 @@ class MyWatchFace extends WatchUi.WatchFace {
 
     // Vertical layout constants (pixels from top of 176 px display)
     // Time stack: 2×40 px rows + 4 px gap = 86 px; CY_TIME is stack vertical center
-    const CY_TIME         = 76;    // +10 px up from prior anchor (86)
+    const CY_TIME         = 80;    // +10 px up from prior anchor (86)
     const TIME_STACK_GAP  = 4;
     const TIME_CX_OFFSET  = -32;   // +10 px further left from prior nudge (-10)
     const Y_HIJRI         = 128;
@@ -686,7 +686,7 @@ class MyWatchFace extends WatchUi.WatchFace {
         var g = cachedGregorianInfo;
         if (g == null) { g = Gregorian.info(Time.now(), Time.FORMAT_SHORT); }
 
-        WeekdaySprites.drawCentered(dc, g.day_of_week, PORTHOLE_CX, getMinuteRowCenterY());
+        WeekdaySprites.drawCentered(dc, g.day_of_week, PORTHOLE_CX - 8, getMinuteRowCenterY());
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -696,31 +696,86 @@ class MyWatchFace extends WatchUi.WatchFace {
     function getWeatherIconResource(conditionCode as Number, mode as Number) as ResourceId {
         switch (conditionCode) {
             case 0:  // CLEAR
+            case 22: // PARTLY_CLEAR
             case 23: // MOSTLY_CLEAR
+            case 40: // FAIR
                 return Theme.pickResource(
-                    Rez.Drawables.weather_sun, Rez.Drawables.weather_sun_light, mode
+                    Rez.Drawables.weather_clear, Rez.Drawables.weather_clear_light, mode
+                );
+
+            case 1:  // PARTLY_CLOUDY
+            case 2:  // MOSTLY_CLOUDY
+            case 52: // THIN_CLOUDS
+                return Theme.pickResource(
+                    Rez.Drawables.weather_partly_cloudy, Rez.Drawables.weather_partly_cloudy_light, mode
+                );
+
+            case 5:  // WINDY
+            case 36: // SQUALL
+                return Theme.pickResource(
+                    Rez.Drawables.weather_wind, Rez.Drawables.weather_wind_light, mode
                 );
 
             case 3:  // RAIN
             case 11: // SCATTERED_SHOWERS
+            case 13: // FREEZING_RAIN
             case 14: // LIGHT_RAIN
             case 15: // HEAVY_RAIN
+            case 24: // FREEZING_DRIZZLE
             case 25: // LIGHT_SHOWERS
             case 26: // SHOWERS
             case 27: // HEAVY_SHOWERS
+            case 31: // DRIZZLE
+            case 45: // RAIN_AND_SNOW
+            case 49: // SLEET
                 return Theme.pickResource(
                     Rez.Drawables.weather_rain, Rez.Drawables.weather_rain_light, mode
                 );
 
             case 6:  // THUNDERSTORMS
+            case 10: // HAIL
             case 12: // SCATTERED_THUNDERSTORMS
+            case 28: // THUNDERSTORM
+            case 32: // TORNADO
+            case 38: // VOLCANIC_ASH
+            case 41: // HURRICANE
+            case 42: // TROPICAL_STORM
                 return Theme.pickResource(
                     Rez.Drawables.weather_storm, Rez.Drawables.weather_storm_light, mode
                 );
 
+            case 4:  // SNOW
+            case 7:  // WINTRY_MIX
+            case 16: // LIGHT_SNOW
+            case 17: // HEAVY_SNOW
+            case 18: // SCATTERED_SNOW
+            case 19: // HEAVY_SCATTERED_SNOW
+            case 21: // SNOW_AND_RAIN
+            case 34: // ICE
+            case 43: // BLIZZARD
+            case 44: // SCATTERED_SNOW_SHOWERS
+            case 46: // SNOW_SHOWERS
+            case 47: // HEAVY_SNOW_SHOWERS
+            case 48: // FLURRIES
+            case 50: // SCATTERED_FLURRIES
+            case 51: // HEAVY_SCATTERED_FLURRIES
+                return Theme.pickResource(
+                    Rez.Drawables.weather_snow, Rez.Drawables.weather_snow_light, mode
+                );
+
+            case 8:  // FOG
+            case 9:  // HAZY
+            case 20: // CLOUDY
+            case 29: // MIST
+            case 30: // DUST
+            case 33: // SMOKE
+            case 35: // SAND
+            case 37: // SANDSTORM
+            case 39: // HAZE
+            case 53: // UNKNOWN
             default:
                 return Theme.pickResource(
-                    Rez.Drawables.weather_cloud, Rez.Drawables.weather_cloud_light, mode
+                    Rez.Drawables.weather_cloudy, Rez.Drawables.weather_cloudy_light, mode
                 );
         }
     }
@@ -750,15 +805,15 @@ class MyWatchFace extends WatchUi.WatchFace {
             }
         }
 
-        var iconX = 30;
+        var iconX = 32;
         var iconY = 2;
 
         var icon = getCachedWeatherIcon(conditionCode, mode);
         dc.drawBitmap(iconX, iconY, icon);
 
         dc.setColor(fg, Graphics.COLOR_TRANSPARENT);
-        var textX = iconX + 24 + 4;
-        dc.drawText(textX, 2, Graphics.FONT_SMALL, tempStr, Graphics.TEXT_JUSTIFY_LEFT);
+        var textX = iconX + icon.getWidth() + 4;
+        dc.drawText(textX, 2, Graphics.FONT_TINY, tempStr, Graphics.TEXT_JUSTIFY_LEFT);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
