@@ -2,14 +2,12 @@
 // MyWatchFace.mc  –  Garmin Instinct 2X / 3 Solar Optimized
 //
 // Layout (top → bottom):
-//   Upper-left    │  [24x24 Weather PNG] + temperature (y≈0) inline using FONT_SMALL
 //   Porthole ring │  cx=143 cy=40 r=30  →  HR (top)  ·  steps (center)
-//   ─────────────────────────────────────────────────────────────────────────
-//   TIME          │  stacked HH/MM, Source Code Pro Bold bitmap digits (28×40), cy≈76
-//   DOW           │  "SUN" etc · Black Ops One bitmap (~72×37) · under porthole · inline w/ minutes
+//   TIME          │  stacked HH/MM, Black Ops One bitmap digits (32×42), cy≈74
+//   Weather       │  [24×24 icon] + temp · centered under porthole · y≈90
+//   Sun / DOW row │  "06:00 FRI 18:00" · FONT_XTINY · centered · y≈110
 //   Hijri date    │  "DD MONTHNAME YYYY"  (month ≤ 7 chars)  centered
 //   Gregorian     │  "DD MMM YYYY"  centered
-//   ─────────────────────────────────────────────────────────────────────────
 //   Battery bar   │  4 px tall · fills from left · proportional to battery %
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -61,7 +59,7 @@ module Theme {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Clock digits — per-digit Source Code Pro Bold bitmap sprites (36×48 px)
+// Clock digits — per-digit Black Ops One bitmap sprites (32×42 px)
 // ─────────────────────────────────────────────────────────────────────────────
 module ClockDigits {
 
@@ -221,93 +219,6 @@ module ClockDigits {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Weekday labels — Black Ops One 3-letter sprites (44×24 px), Garmin DOW 1–7
-// ─────────────────────────────────────────────────────────────────────────────
-module WeekdaySprites {
-
-    var cachedColorMode = -1;
-
-    var weekdaySun = null;
-    var weekdayMon = null;
-    var weekdayTue = null;
-    var weekdayWed = null;
-    var weekdayThu = null;
-    var weekdayFri = null;
-    var weekdaySat = null;
-
-    function loadDay(dayOfWeek as Number, mode as Number) as BitmapResource or Null {
-        switch (dayOfWeek) {
-            case 1:
-                return WatchUi.loadResource(
-                    Theme.pickResource(Rez.Drawables.weekday_sun, Rez.Drawables.weekday_sun_light, mode)
-                ) as BitmapResource;
-            case 2:
-                return WatchUi.loadResource(
-                    Theme.pickResource(Rez.Drawables.weekday_mon, Rez.Drawables.weekday_mon_light, mode)
-                ) as BitmapResource;
-            case 3:
-                return WatchUi.loadResource(
-                    Theme.pickResource(Rez.Drawables.weekday_tue, Rez.Drawables.weekday_tue_light, mode)
-                ) as BitmapResource;
-            case 4:
-                return WatchUi.loadResource(
-                    Theme.pickResource(Rez.Drawables.weekday_wed, Rez.Drawables.weekday_wed_light, mode)
-                ) as BitmapResource;
-            case 5:
-                return WatchUi.loadResource(
-                    Theme.pickResource(Rez.Drawables.weekday_thu, Rez.Drawables.weekday_thu_light, mode)
-                ) as BitmapResource;
-            case 6:
-                return WatchUi.loadResource(
-                    Theme.pickResource(Rez.Drawables.weekday_fri, Rez.Drawables.weekday_fri_light, mode)
-                ) as BitmapResource;
-            case 7:
-                return WatchUi.loadResource(
-                    Theme.pickResource(Rez.Drawables.weekday_sat, Rez.Drawables.weekday_sat_light, mode)
-                ) as BitmapResource;
-        }
-        return null;
-    }
-
-    function ensure(mode as Number) as Void {
-        if (weekdaySun != null && cachedColorMode == mode) {
-            return;
-        }
-        cachedColorMode = mode;
-        weekdaySun = loadDay(1, mode);
-        weekdayMon = loadDay(2, mode);
-        weekdayTue = loadDay(3, mode);
-        weekdayWed = loadDay(4, mode);
-        weekdayThu = loadDay(5, mode);
-        weekdayFri = loadDay(6, mode);
-        weekdaySat = loadDay(7, mode);
-    }
-
-    function bitmapForDay(dayOfWeek as Number) as BitmapResource or Null {
-        switch (dayOfWeek) {
-            case 1: return weekdaySun;
-            case 2: return weekdayMon;
-            case 3: return weekdayTue;
-            case 4: return weekdayWed;
-            case 5: return weekdayThu;
-            case 6: return weekdayFri;
-            case 7: return weekdaySat;
-        }
-        return null;
-    }
-
-    function drawCentered(dc, dayOfWeek as Number, cx as Number, cy as Number) as Void {
-        var bmp = bitmapForDay(dayOfWeek);
-        if (bmp == null) {
-            return;
-        }
-        var w = bmp.getWidth();
-        var h = bmp.getHeight();
-        dc.drawBitmap(cx - w / 2, cy - h / 2, bmp);
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 // Hijri calendar helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -412,6 +323,11 @@ module TimeHelpers {
             :hour => clockTime.hour.format("%02d"),
             :min  => clockTime.min.format("%02d")
         };
+    }
+
+    function formatHm(moment) as String {
+        var info = Gregorian.info(moment, Time.FORMAT_SHORT);
+        return info.hour.format("%02d") + ":" + info.min.format("%02d");
     }
 }
 
@@ -543,6 +459,8 @@ class MyWatchFace extends WatchUi.WatchFace {
     var cachedSteps = 0;
 
     var cachedGregorianInfo = null;
+    var cachedSunrise = null;
+    var cachedSunset  = null;
     var iconHeart = null;
     var iconSteps = null;
     var cachedWeatherIcon = null;
@@ -556,14 +474,15 @@ class MyWatchFace extends WatchUi.WatchFace {
     const PORTHOLE_ICON_GAP = 2;
     const Y_PORTHOLE_HR     = PORTHOLE_CY - 20;
     const Y_PORTHOLE_STEPS  = PORTHOLE_CY;
+    const Y_PORTHOLE_BOTTOM = PORTHOLE_CY + PORTHOLE_R;
 
     // Vertical layout constants (pixels from top of 176 px display)
-    // Time stack: 2×40 px rows + 4 px gap = 86 px; CY_TIME is stack vertical center
-    const CY_TIME         = 80;    // +10 px up from prior anchor (86)
+    const CY_TIME         = 64;
     const TIME_STACK_GAP  = 4;
-    const TIME_CX_OFFSET  = -32;   // +10 px further left from prior nudge (-10)
-    const Y_HIJRI         = 128;
-    const Y_GREGORIAN     = 148;
+    const TIME_CX_OFFSET  = -26;
+    const Y_SUN_ROW       = 114;
+    const Y_HIJRI         = 132;
+    const Y_GREGORIAN     = 150;
     const Y_BATTERY_BAR = 172;
     const H_BATTERY_BAR = 4;
 
@@ -586,7 +505,6 @@ class MyWatchFace extends WatchUi.WatchFace {
 
     function ensureThemeAssets(mode as Number) as Void {
         ClockDigits.ensure(mode);
-        WeekdaySprites.ensure(mode);
         if (loadedAssetColorMode != mode) {
             reloadThemedBitmaps(mode);
         }
@@ -630,6 +548,14 @@ class MyWatchFace extends WatchUi.WatchFace {
                     lastWeatherFetchTime = now;
                 }
             }
+            if (Weather has :getSunrise && cachedConditions != null) {
+                var pos = cachedConditions.observationLocationPosition;
+                if (pos != null) {
+                    var today = Time.now();
+                    cachedSunrise = Weather.getSunrise(pos, today);
+                    cachedSunset  = Weather.getSunset(pos, today);
+                }
+            }
         }
 
         updateActivityData();
@@ -653,10 +579,10 @@ class MyWatchFace extends WatchUi.WatchFace {
         dc.setColor(fg, Graphics.COLOR_TRANSPARENT);
 
         drawTime(dc);
-        drawWeekdayByPorthole(dc);
-        drawUpperLeftWeather(dc, mode, fg);
+        drawWeatherByPorthole(dc, mode, fg);
         drawPortholeFrame(dc, accent);
         drawPortholeContents(dc, fg);
+        drawSunDayRow(dc, fg);
         drawCenterDates(dc, fg);
         drawBatteryBar(dc, fg, accent);
     }
@@ -674,23 +600,8 @@ class MyWatchFace extends WatchUi.WatchFace {
         ClockDigits.drawStacked24h(dc, hourStr, minStr, cx, CY_TIME, TIME_STACK_GAP);
     }
 
-    function getMinuteRowCenterY() as Number {
-        var rowH   = ClockDigits.digitHeight();
-        var totalH = ClockDigits.stackHeight(TIME_STACK_GAP);
-        var hourY  = CY_TIME - totalH / 2;
-        var minY   = hourY + rowH + TIME_STACK_GAP;
-        return minY + rowH / 2;
-    }
-
-    function drawWeekdayByPorthole(dc) {
-        var g = cachedGregorianInfo;
-        if (g == null) { g = Gregorian.info(Time.now(), Time.FORMAT_SHORT); }
-
-        WeekdaySprites.drawCentered(dc, g.day_of_week, PORTHOLE_CX - 8, getMinuteRowCenterY());
-    }
-
     // ─────────────────────────────────────────────────────────────────────────
-    // ② Upper Left Corner — 24x24 weather PNG + FONT_SMALL temp
+    // ② Weather under porthole — 24×24 icon + FONT_TINY temp
     // ─────────────────────────────────────────────────────────────────────────
 
     function getWeatherIconResource(conditionCode as Number, mode as Number) as ResourceId {
@@ -792,7 +703,7 @@ class MyWatchFace extends WatchUi.WatchFace {
         return cachedWeatherIcon;
     }
 
-    function drawUpperLeftWeather(dc, mode as Number, fg as Number) {
+    function drawWeatherByPorthole(dc, mode as Number, fg as Number) {
         var tempStr = "--\u00B0C";
         var conditionCode = -1;
 
@@ -805,15 +716,52 @@ class MyWatchFace extends WatchUi.WatchFace {
             }
         }
 
-        var iconX = 32;
-        var iconY = 2;
-
         var icon = getCachedWeatherIcon(conditionCode, mode);
-        dc.drawBitmap(iconX, iconY, icon);
+        var iconW = icon.getWidth();
+        var iconH = icon.getHeight();
+        var dims = dc.getTextDimensions(tempStr, Graphics.FONT_TINY);
+        var textW = dims[0];
+        var gap = 4;
+        var totalW = iconW + gap + textW;
+        var leftX = PORTHOLE_CX - totalW / 2;
+        var cy = (Y_PORTHOLE_BOTTOM + Y_SUN_ROW) / 2;
+
+        dc.drawBitmap(leftX, cy - iconH / 2, icon);
+        dc.setColor(fg, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(
+            leftX + iconW + gap,
+            cy,
+            Graphics.FONT_TINY,
+            tempStr,
+            Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER
+        );
+    }
+
+    function drawSunDayRow(dc, fg as Number) {
+        var g = cachedGregorianInfo;
+        if (g == null) { g = Gregorian.info(Time.now(), Time.FORMAT_SHORT); }
+
+        var sunriseStr = "--:--";
+        var sunsetStr  = "--:--";
+        if (cachedSunrise != null) {
+            sunriseStr = TimeHelpers.formatHm(cachedSunrise);
+        }
+        if (cachedSunset != null) {
+            sunsetStr = TimeHelpers.formatHm(cachedSunset);
+        }
+
+        var line = sunriseStr + " " +
+                   HijriHelpers.weekdayAbbr(g.day_of_week) + " " +
+                   sunsetStr;
 
         dc.setColor(fg, Graphics.COLOR_TRANSPARENT);
-        var textX = iconX + icon.getWidth() + 4;
-        dc.drawText(textX, 2, Graphics.FONT_TINY, tempStr, Graphics.TEXT_JUSTIFY_LEFT);
+        dc.drawText(
+            dc.getWidth() / 2,
+            Y_SUN_ROW,
+            Graphics.FONT_XTINY,
+            line,
+            Graphics.TEXT_JUSTIFY_CENTER
+        );
     }
 
     // ─────────────────────────────────────────────────────────────────────────
