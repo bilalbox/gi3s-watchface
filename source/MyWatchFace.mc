@@ -9,6 +9,7 @@
 //   Hijri date    │  "DD MONTHNAME YYYY"  (month ≤ 7 chars)  centered
 //   Gregorian     │  "DD MMM YYYY"  centered
 //   Battery bar   │  4 px tall · fills from left · proportional to battery %
+//   Body battery  │  4 px wide · left inset · fills bottom-up · 0–100 %
 // ─────────────────────────────────────────────────────────────────────────────
 
 import Toybox.Graphics;
@@ -457,6 +458,7 @@ class MyWatchFace extends WatchUi.WatchFace {
     const SYSTEM_STATS_UPDATE_INTERVAL = 5 * 60;
 
     var cachedSteps = 0;
+    var cachedBodyBattery = null;
 
     var cachedGregorianInfo = null;
     var cachedSunrise = null;
@@ -485,6 +487,9 @@ class MyWatchFace extends WatchUi.WatchFace {
     const Y_GREGORIAN     = 150;
     const Y_BATTERY_BAR = 172;
     const H_BATTERY_BAR = 4;
+    const X_BODY_BATTERY_BAR = 4;
+    const W_BODY_BATTERY_BAR = 4;
+    const DEBUG_BODY_BATTERY = -1; // hardcoded % for layout debug; set to -1 for live data
 
     function initialize() {
         WatchFace.initialize();
@@ -560,6 +565,7 @@ class MyWatchFace extends WatchUi.WatchFace {
 
         updateActivityData();
         refreshCachedHeartRate();
+        refreshCachedBodyBattery();
         WatchUi.requestUpdate();
     }
 
@@ -584,6 +590,7 @@ class MyWatchFace extends WatchUi.WatchFace {
         drawPortholeContents(dc, fg);
         drawSunDayRow(dc, fg);
         drawCenterDates(dc, fg);
+        drawBodyBatteryBar(dc, fg, accent);
         drawBatteryBar(dc, fg, accent);
     }
 
@@ -825,7 +832,30 @@ class MyWatchFace extends WatchUi.WatchFace {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // ⑤ Battery bar
+    // ⑤ Body battery bar (left edge)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    function drawBodyBatteryBar(dc, fg as Number, accent as Number) {
+        var barH = Y_BATTERY_BAR;
+        var pct  = 0.0;
+        if (DEBUG_BODY_BATTERY >= 0) {
+            pct = DEBUG_BODY_BATTERY.toFloat() / 100.0;
+        } else if (cachedBodyBattery != null) {
+            pct = cachedBodyBattery.toFloat() / 100.0;
+        }
+        var fillH = (barH.toFloat() * pct).toNumber();
+
+        dc.setColor(accent, Graphics.COLOR_TRANSPARENT);
+        dc.fillRectangle(X_BODY_BATTERY_BAR, 0, W_BODY_BATTERY_BAR, barH);
+
+        if (fillH > 0) {
+            dc.setColor(fg, Graphics.COLOR_TRANSPARENT);
+            dc.fillRectangle(X_BODY_BATTERY_BAR, barH - fillH, W_BODY_BATTERY_BAR, fillH);
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // ⑥ Battery bar
     // ─────────────────────────────────────────────────────────────────────────
 
     function drawBatteryBar(dc, fg as Number, accent as Number) {
@@ -911,5 +941,46 @@ class MyWatchFace extends WatchUi.WatchFace {
         }
 
         cachedHrDisplay = HEART_RATE_PLACEHOLDER;
+    }
+
+    function readBodyBatteryFromIterator(iter) as Number or Null {
+        if (iter == null) {
+            return null;
+        }
+
+        var sample = iter.next();
+        while (sample != null) {
+            if (sample.data != null) {
+                var bb = sample.data;
+                var n  = (bb instanceof Float) ? (bb as Float).toNumber() : bb.toNumber();
+                if (n >= 0 && n <= 100) {
+                    return n;
+                }
+            }
+            sample = iter.next();
+        }
+        return null;
+    }
+
+    function refreshCachedBodyBattery() as Void {
+        if (DEBUG_BODY_BATTERY >= 0) {
+            return;
+        }
+
+        cachedBodyBattery = null;
+        if (!(Toybox has :SensorHistory) || !(SensorHistory has :getBodyBatteryHistory)) {
+            return;
+        }
+
+        var bb = readBodyBatteryFromIterator(SensorHistory.getBodyBatteryHistory({
+            :period => 1,
+            :order  => SensorHistory.ORDER_NEWEST_FIRST
+        }));
+
+        if (bb == null) {
+            bb = readBodyBatteryFromIterator(SensorHistory.getBodyBatteryHistory({}));
+        }
+
+        cachedBodyBattery = bb;
     }
 }
