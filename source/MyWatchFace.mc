@@ -2,7 +2,7 @@
 // MyWatchFace.mc  –  Garmin Instinct 2X / 3 Solar Optimized
 //
 // Layout (top → bottom):
-//   Porthole ring │  cx=143 cy=40 r=30  →  HR (top)  ·  steps (center)
+//   Porthole      │  upper-right  →  HR (top)  ·  steps (center)
 //   TIME          │  stacked HH/MM, Black Ops One bitmap digits (32×42), cy≈74
 //   Weather       │  [24×24 icon] + temp · centered under porthole · y≈90
 //   Sun / DOW row │  "06:00 FRI 18:00" · FONT_XTINY · centered · y≈110
@@ -469,14 +469,12 @@ class MyWatchFace extends WatchUi.WatchFace {
     var cachedWeatherKey = -1;
     var loadedAssetColorMode = -1;
 
-    // Porthole geometry
-    const PORTHOLE_CX = 143;
-    const PORTHOLE_CY = 40;
-    const PORTHOLE_R  = 30;
+    // Porthole layout
+    const PORTHOLE_CX = 144;
+    const Y_PORTHOLE_HR = 20;
+    const Y_PORTHOLE_STEPS = 40;
     const PORTHOLE_ICON_GAP = 2;
-    const Y_PORTHOLE_HR     = PORTHOLE_CY - 20;
-    const Y_PORTHOLE_STEPS  = PORTHOLE_CY;
-    const Y_PORTHOLE_BOTTOM = PORTHOLE_CY + PORTHOLE_R;
+    const Y_PORTHOLE_BOTTOM = 70;
 
     // Vertical layout constants (pixels from top of 176 px display)
     const CY_TIME         = 64;
@@ -489,6 +487,7 @@ class MyWatchFace extends WatchUi.WatchFace {
     const H_BATTERY_BAR = 4;
     const X_BODY_BATTERY_BAR = 4;
     const W_BODY_BATTERY_BAR = 4;
+    const MIN_BB_FILL_PX = 5;
     const DEBUG_BODY_BATTERY = -1; // hardcoded % for layout debug; set to -1 for live data
 
     function initialize() {
@@ -586,7 +585,6 @@ class MyWatchFace extends WatchUi.WatchFace {
 
         drawTime(dc);
         drawWeatherByPorthole(dc, mode, fg);
-        drawPortholeFrame(dc, accent);
         drawPortholeContents(dc, fg);
         drawSunDayRow(dc, fg);
         drawCenterDates(dc, fg);
@@ -757,8 +755,8 @@ class MyWatchFace extends WatchUi.WatchFace {
             sunsetStr = TimeHelpers.formatHm(cachedSunset);
         }
 
-        var line = sunriseStr + " " +
-                   HijriHelpers.weekdayAbbr(g.day_of_week) + " " +
+        var line = sunriseStr + "  " +
+                   HijriHelpers.weekdayAbbr(g.day_of_week) + "  " +
                    sunsetStr;
 
         dc.setColor(fg, Graphics.COLOR_TRANSPARENT);
@@ -772,15 +770,8 @@ class MyWatchFace extends WatchUi.WatchFace {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // ③ Porthole frame & contents
+    // ③ Porthole contents
     // ─────────────────────────────────────────────────────────────────────────
-
-    function drawPortholeFrame(dc, accent as Number) {
-        dc.setPenWidth(2);
-        dc.setColor(accent, Graphics.COLOR_TRANSPARENT);
-        dc.drawArc(PORTHOLE_CX, PORTHOLE_CY, PORTHOLE_R,
-                   Graphics.ARC_CLOCKWISE, 90, 91);
-    }
 
     function drawPortholeMetric(dc, cx, y, icon as BitmapResource, valueStr as String, fg as Number) as Void {
         var iconW  = icon.getWidth();
@@ -837,18 +828,27 @@ class MyWatchFace extends WatchUi.WatchFace {
 
     function drawBodyBatteryBar(dc, fg as Number, accent as Number) {
         var barH = Y_BATTERY_BAR;
-        var pct  = 0.0;
+        var bbValue = null;
+
         if (DEBUG_BODY_BATTERY >= 0) {
-            pct = DEBUG_BODY_BATTERY.toFloat() / 100.0;
+            bbValue = DEBUG_BODY_BATTERY;
         } else if (cachedBodyBattery != null) {
-            pct = cachedBodyBattery.toFloat() / 100.0;
+            bbValue = cachedBodyBattery;
         }
-        var fillH = (barH.toFloat() * pct).toNumber();
 
+        dc.setPenWidth(1);
         dc.setColor(accent, Graphics.COLOR_TRANSPARENT);
-        dc.fillRectangle(X_BODY_BATTERY_BAR, 0, W_BODY_BATTERY_BAR, barH);
+        dc.drawRectangle(X_BODY_BATTERY_BAR, 0, W_BODY_BATTERY_BAR, barH);
 
-        if (fillH > 0) {
+        if (bbValue != null && bbValue > 0) {
+            var fillH = (barH.toFloat() * bbValue.toFloat() / 100.0).toNumber();
+            if (fillH < MIN_BB_FILL_PX) {
+                fillH = MIN_BB_FILL_PX;
+            }
+            if (fillH > barH) {
+                fillH = barH;
+            }
+
             dc.setColor(fg, Graphics.COLOR_TRANSPARENT);
             dc.fillRectangle(X_BODY_BATTERY_BAR, barH - fillH, W_BODY_BATTERY_BAR, fillH);
         }
