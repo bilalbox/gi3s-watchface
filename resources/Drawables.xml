@@ -1,23 +1,6 @@
 <resources>
    <bitmap id="launcher" filename="images/launcher.png" />
-   <bitmap id="weather_clear" filename="images/weather_clear.png" />
-   <bitmap id="weather_partly_cloudy" filename="images/weather_partly_cloudy.png" />
-   <bitmap id="weather_cloudy" filename="images/weather_cloudy.png" />
-   <bitmap id="weather_wind" filename="images/weather_wind.png" />
-   <bitmap id="weather_rain" filename="images/weather_rain.png" />
-   <bitmap id="weather_storm" filename="images/weather_storm.png" />
-   <bitmap id="weather_snow" filename="images/weather_snow.png" />
-   <bitmap id="weather_clear_light" filename="images/weather_clear_light.png" />
-   <bitmap id="weather_partly_cloudy_light" filename="images/weather_partly_cloudy_light.png" />
-   <bitmap id="weather_cloudy_light" filename="images/weather_cloudy_light.png" />
-   <bitmap id="weather_wind_light" filename="images/weather_wind_light.png" />
-   <bitmap id="weather_rain_light" filename="images/weather_rain_light.png" />
-   <bitmap id="weather_storm_light" filename="images/weather_storm_light.png" />
-   <bitmap id="weather_snow_light" filename="images/weather_snow_light.png" />
-   <bitmap id="icon_heart" filename="images/icon_heart.png" />
-   <bitmap id="icon_steps" filename="images/icon_steps.png" />
-   <bitmap id="icon_heart_light" filename="images/icon_heart_light.png" />
-   <bitmap id="icon_steps_light" filename="images/icon_steps_light.png" />
+
    <bitmap id="digit_0" filename="images/digit_0.png" />
    <bitmap id="digit_1" filename="images/digit_1.png" />
    <bitmap id="digit_2" filename="images/digit_2.png" />
@@ -38,4 +21,96 @@
    <bitmap id="digit_7_light" filename="images/digit_7_light.png" />
    <bitmap id="digit_8_light" filename="images/digit_8_light.png" />
    <bitmap id="digit_9_light" filename="images/digit_9_light.png" />
+
+   <bitmap id="sm_0" filename="images/sm_0.png" />
+   <bitmap id="sm_1" filename="images/sm_1.png" />
+   <bitmap id="sm_2" filename="images/sm_2.png" />
+   <bitmap id="sm_3" filename="images/sm_3.png" />
+   <bitmap id="sm_4" filename="images/sm_4.png" />
+   <bitmap id="sm_5" filename="images/sm_5.png" />
+   <bitmap id="sm_6" filename="images/sm_6.png" />
+   <bitmap id="sm_7" filename="images/sm_7.png" />
+   <bitmap id="sm_8" filename="images/sm_8.png" />
+   <bitmap id="sm_9" filename="images/sm_9.png" />
+   <bitmap id="sm_minus" filename="images/sm_minus.png" />
+   <bitmap id="sm_degree" filename="images/sm_degree.png" />
+   <bitmap id="sm_meem" filename="images/sm_meem.png" />
+   <bitmap id="sm_0_light" filename="images/sm_0_light.png" />
+   <bitmap id="sm_1_light" filename="images/sm_1_light.png" />
+   <bitmap id="sm_2_light" filename="images/sm_2_light.png" />
+   <bitmap id="sm_3_light" filename="images/sm_3_light.png" />
+   <bitmap id="sm_4_light" filename="images/sm_4_light.png" />
+   <bitmap id="sm_5_light" filename="images/sm_5_light.png" />
+   <bitmap id="sm_6_light" filename="images/sm_6_light.png" />
+   <bitmap id="sm_7_light" filename="images/sm_7_light.png" />
+   <bitmap id="sm_8_light" filename="images/sm_8_light.png" />
+   <bitmap id="sm_9_light" filename="images/sm_9_light.png" />
+   <bitmap id="sm_minus_light" filename="images/sm_minus_light.png" />
+   <bitmap id="sm_degree_light" filename="images/sm_degree_light.png" />
+   <bitmap id="sm_meem_light" filename="images/sm_meem_light.png" />
+
+   <bitmap id="hijri_1" filename="images/hijri_1.png" />
+   <bitmap id="hijri_2" filename="images/hijri_2.png" />
+   <bitmap id="hijri_3" filename="images/hijri_3.png" />
+   <bitmap id="hijri_4" filename="images/hijri_4.png" />
+   <bitmap id="hijri_5" filename="images/hijri_5.png" />
+   <bitmap id="hijri_6" filename="images/hijri_6.png" />
+   <bitmap id="hijri_7" filename="images/hijri_7.png" />
+   <bitmap id="hijri_8" filename="images/hijri_8.png" />
+   <bitmap id="hijri_9" filename="images/hijri_9.png" />
+   <bitmap id="hijri_10" filename="images/hijri_10.png" />
+   <bitmap id="hijri_11" filename="images/hijri_11.png" />
+   <bitmap id="hijri_12" filename="images/hijri_12.png" />
+   <bitmap id="hijri_1_light" filename="images/hijri_1_light.png" />
+   <bitmap id="hijri_2_light" filename="images/hijri_2_light.png" />
+   <bitmap id="hijri_3_light" filename="images/hijri_3_light.png" />
+   <bitmap id="hijri_4_light" filename="images/hijri_4_light.png" />
+   <bitmap id="hijri_5_light" filename="images/hijri_5_light.png" />
+   <bitmap id="hijri_6_light" filename="images/hijri_6_light.png" />
+   <bitmap id="hijri_7_light" filename="images/hijri_7_light.png" />
+   <bitmap id="hijri_8_light" filename="images/hijri_8_light.png" />
+   <bitmap id="hijri_9_light" filename="images/hijri_9_light.png" />
+   <bitmap id="hijri_10_light" filename="images/hijri_10_light.png" />
+   <bitmap id="hijri_11_light" filename="images/hijri_11_light.png" />
+   <bitmap id="hijri_12_light" filename="images/hijri_12_light.png" />
+
+   <bitmap id="greg_1" filename="images/greg_1.png" />
+   <bitmap id="greg_2" filename="images/greg_2.png" />
+   <bitmap id="greg_3" filename="images/greg_3.png" />
+   <bitmap id="greg_4" filename="images/greg_4.png" />
+   <bitmap id="greg_5" filename="images/greg_5.png" />
+   <bitmap id="greg_6" filename="images/greg_6.png" />
+   <bitmap id="greg_7" filename="images/greg_7.png" />
+   <bitmap id="greg_8" filename="images/greg_8.png" />
+   <bitmap id="greg_9" filename="images/greg_9.png" />
+   <bitmap id="greg_10" filename="images/greg_10.png" />
+   <bitmap id="greg_11" filename="images/greg_11.png" />
+   <bitmap id="greg_12" filename="images/greg_12.png" />
+   <bitmap id="greg_1_light" filename="images/greg_1_light.png" />
+   <bitmap id="greg_2_light" filename="images/greg_2_light.png" />
+   <bitmap id="greg_3_light" filename="images/greg_3_light.png" />
+   <bitmap id="greg_4_light" filename="images/greg_4_light.png" />
+   <bitmap id="greg_5_light" filename="images/greg_5_light.png" />
+   <bitmap id="greg_6_light" filename="images/greg_6_light.png" />
+   <bitmap id="greg_7_light" filename="images/greg_7_light.png" />
+   <bitmap id="greg_8_light" filename="images/greg_8_light.png" />
+   <bitmap id="greg_9_light" filename="images/greg_9_light.png" />
+   <bitmap id="greg_10_light" filename="images/greg_10_light.png" />
+   <bitmap id="greg_11_light" filename="images/greg_11_light.png" />
+   <bitmap id="greg_12_light" filename="images/greg_12_light.png" />
+
+   <bitmap id="dow_1" filename="images/dow_1.png" />
+   <bitmap id="dow_2" filename="images/dow_2.png" />
+   <bitmap id="dow_3" filename="images/dow_3.png" />
+   <bitmap id="dow_4" filename="images/dow_4.png" />
+   <bitmap id="dow_5" filename="images/dow_5.png" />
+   <bitmap id="dow_6" filename="images/dow_6.png" />
+   <bitmap id="dow_7" filename="images/dow_7.png" />
+   <bitmap id="dow_1_light" filename="images/dow_1_light.png" />
+   <bitmap id="dow_2_light" filename="images/dow_2_light.png" />
+   <bitmap id="dow_3_light" filename="images/dow_3_light.png" />
+   <bitmap id="dow_4_light" filename="images/dow_4_light.png" />
+   <bitmap id="dow_5_light" filename="images/dow_5_light.png" />
+   <bitmap id="dow_6_light" filename="images/dow_6_light.png" />
+   <bitmap id="dow_7_light" filename="images/dow_7_light.png" />
 </resources>

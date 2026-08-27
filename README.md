@@ -1,6 +1,6 @@
 # My Watch Face for Garmin Instinct 3 Solar 45mm
 
-A Connect IQ watch face for the **Garmin Instinct 3 Solar 45mm** with stacked Black Ops One time digits, sunrise/sunset row, dual-calendar dates, weather, and an activity porthole.
+An Arabic-only Connect IQ watch face for the **Garmin Instinct 3 Solar 45mm**: stacked Noto Kufi Arabic-Indic time, dual calendar (Hijri + Gregorian) without years, weekday, temperature in °م, and an activity porthole.
 
 > **Note:** Source is intentionally monolithic in a single `MyWatchFace.mc` file for easy sharing and review.
 
@@ -8,98 +8,95 @@ A Connect IQ watch face for the **Garmin Instinct 3 Solar 45mm** with stacked Bl
 
 ```
 ┌─────────────────────────────────────┐
-│                         ╭─ ♥ 80 ─╮ │
-│   HH                    │ 👣 1234 │ │
-│   MM                    [☀] 12°C  │
+│                         ╭─  ٨٠  ─╮ │
+│   ١٤                    │  ١٢٣٤  │ │
+│   ٣٥                    ٢٣°م     │
 │                                     │
-│        06:00 FRI 18:00              │
-│        15 DHU HIJ 1447              │
-│        31 MAY 2026                  │
+│            الخميس                   │
+│         جمادى الآخرة  ١٥            │
+│            أغسطس  ٢٧                │
 │▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░░░░░░░░░░░░░░░░░░░░│ battery
 └─────────────────────────────────────┘
 ```
+
+Porthole legend is position (HR top, steps below). Date rows are month + day, day on the right.
 
 ## Features
 
 ### Time
 
 - **Stacked 24 h** — `HH` over `MM` (no colon)
-- **Black Ops One bitmap digits** — 10 per-digit 32×42 sprites (binarized for MIP)
-- Positioned upper-left toward center
+- **Noto Kufi Arabic-Indic digits** — proportional ٠–٩ sprites, dark + light
+- Positioned upper-left toward center (clears the porthole)
 
-### Sun times & weekday
+### Weekday
 
-- **Sunrise / sunset / DOW row** — `06:00 FRI 18:00` in `FONT_XTINY`, centered just above the Hijri date
-- Sunrise and sunset from `Weather.getSunrise()` / `Weather.getSunset()` (requires phone weather sync and location)
-- Falls back to `--:-- FRI --:--` when sun times are unavailable
+- Full Arabic name, centered (`الأحد` … `السبت`)
+- Sunrise/sunset are not shown
 
 ### Dates
 
-- **Hijri** — `DD MONTHNAME YYYY` (e.g. `15 DHU HIJ 1447`)
-- **Gregorian** — `DD MMM YYYY` (e.g. `31 MAY 2026`)
+- **Hijri** — full month name + day (no year)
+- **Gregorian** — `يناير`…`ديسمبر` + day (no year)
 - **Hijri offset** — configurable ±2 days (Settings → Hijri date shift)
-- **Color theme** — dark (default) or light background with matching text and bitmap ink
+- **Color theme** — dark (default) or light
 
-### Weather (under porthole)
+### Temperature
 
-- 24×24 **1-bit PNG sprites** (7 categories: clear, partly cloudy, cloudy, wind, rain, storm, snow) + temperature in °C
-- Centered horizontally under the activity porthole, vertically between the porthole bottom and the sun/DOW row
-- Hand-drawn pixel icons tuned for MIP readability; Garmin condition codes map to 7 buckets (fog → cloudy, wintry mix → snow, etc.)
-- Refreshed at most every **15 minutes**
+- Arabic-Indic digits + `°م` under the porthole
+- Missing data draws `--°م`
+- Weather condition icons are not shown
 
 ### Activity porthole (upper-right)
 
-- **Heart rate** — heart icon + value (upper porthole)
-- **Steps** — shoeprint icon + count (porthole vertical center)
-- Updated on the same **once-per-minute** tick as the rest of the face
+- **Heart rate** (top) and **steps** (below), numbers only
+- Missing HR draws `--`
 
 ### Battery bar
 
 - 4 px bar at the bottom, proportional fill
+- Body Battery bar on the left edge
 
 ## Power efficiency
 
-All UI updates run on a **single 60-second timer** — no sub-minute partial redraws.
+All UI updates run on a **single 60-second timer**.
 
 | Mechanism | Detail |
 |-----------|--------|
-| Minute tick | `Timer` fires every 60 s; refreshes steps, HR, dates, weather cache, then full redraw |
+| Minute tick | `Timer` every 60 s; refreshes steps, HR, dates, weather cache, then full redraw |
 | Cached weather | `Weather.getCurrentConditions()` at most every 15 min |
-| Cached sun times | `Weather.getSunrise()` / `getSunset()` on the same tick when weather data is available |
 | Cached battery | `System.getSystemStats()` at most every 5 min |
-| No background service | No `Background` permission — no wake-ups when face is inactive |
+| No background service | No `Background` permission |
 | No partial updates | Full 176×176 redraw once per minute only |
 
 ## Modules
 
 | Module | Purpose |
 |--------|---------|
-| `Theme` | `colorMode` property, palette colors, dark/light resource selection |
-| `ClockDigits` | Black Ops One per-digit bitmap renderer for stacked time |
-| `HijriHelpers` | Hijri calendar, weekday abbreviation, and date label helpers |
-| `TimeHelpers` | Hour/minute formatting for stacked time and sun times |
+| `Theme` | `colorMode` property, palette, dark/light resource selection |
+| `ClockDigits` | Large proportional Arabic-Indic time digits |
+| `SmallDigits` | Small digits, minus, degree, `م` for dates / porthole / temp |
+| `ArabicLabels` | Current Hijri month, Gregorian month, and weekday bitmaps |
+| `HijriHelpers` | Tabular Hijri conversion |
+| `TimeHelpers` | Hour/minute formatting for stacked time |
 
-Clock digit sprites (`digit_0.png` … `digit_9.png`, 32×42, plus `*_light.png` for light theme) regenerate via [`scripts/generate-clock-digits.ps1`](scripts/generate-clock-digits.ps1) using [Black Ops One](https://fonts.google.com/specimen/Black+Ops+One) (OFL).
-
-Weather icons are 24×24 hand-drawn PNGs in [`resources/images/`](resources/images/) (regenerate via [`scripts/generate-weather-icons.ps1`](scripts/generate-weather-icons.ps1); each icon has a `_light` variant).
-
-Porthole metric icons (`icon_heart.png` 10×10, `icon_steps.png` 12×12, plus `_light` variants) regenerate via [`scripts/generate-porthole-icons.ps1`](scripts/generate-porthole-icons.ps1).
+Sprites regenerate via [`scripts/generate-arabic-assets.ps1`](scripts/generate-arabic-assets.ps1) from [Noto Kufi Arabic Bold](https://fonts.google.com/noto/specimen/Noto+Kufi+Arabic) (OFL).
 
 ## Settings
 
 | Where | What |
 |-------|------|
 | On watch | Long-press **UP** → Customize → **Watch face settings** → Hijri date shift or Color theme |
-| Garmin Connect / Express | App settings: Hijri date adjustment, Color theme (dark / light list) |
+| Garmin Connect / Express | App settings: Hijri date adjustment, Color theme (dark / light) |
 
-Default theme is **dark** (unchanged look for existing installs).
+Settings menus stay **English**. Default theme is **dark**.
 
 ## Permissions
 
 | Permission | Used for |
 |------------|----------|
 | `UserProfile` | User profile data |
-| `positioning` | Weather location and sunrise/sunset |
+| `positioning` | Weather location |
 | `SensorHistory` | Heart rate history fallback |
 
 ## Building
@@ -108,6 +105,12 @@ Default theme is **dark** (unchanged look for existing installs).
 
 1. [Connect IQ SDK](https://developer.garmin.com/connect-iq/connect-iq-basics/getting-started/)
 2. `developer_key.der` in the project root
+
+### Assets
+
+```shell
+powershell -ExecutionPolicy Bypass -File scripts/generate-arabic-assets.ps1
+```
 
 ### Build
 

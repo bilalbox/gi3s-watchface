@@ -2,14 +2,15 @@
 // MyWatchFace.mc  –  Garmin Instinct 2X / 3 Solar Optimized
 //
 // Layout (top → bottom):
-//   Porthole      │  upper-right  →  HR (top)  ·  steps (center)
-//   TIME          │  stacked HH/MM, Black Ops One bitmap digits (32×42), cy≈74
-//   Weather       │  [24×24 icon] + temp · centered under porthole · y≈90
-//   Sun / DOW row │  "06:00 FRI 18:00" · FONT_XTINY · centered · y≈110
-//   Hijri date    │  "DD MONTHNAME YYYY"  (month ≤ 7 chars)  centered
-//   Gregorian     │  "DD MMM YYYY"  centered
+//   Porthole      │  upper-right  →  HR (top)  ·  steps (center)  ·  numbers only
+//   TIME          │  stacked HH/MM, Noto Kufi Arabic-Indic digits, cy≈64
+//   Temperature   │  Arabic-Indic °م · centered under porthole
+//   Weekday       │  full Arabic name bitmap · centered
+//   Hijri date    │  month bitmap + day  (no year)
+//   Gregorian     │  month bitmap + day  (no year)
 //   Battery bar   │  4 px tall · fills from left · proportional to battery %
 //   Body battery  │  4 px wide · left inset · fills bottom-up · 0–100 %
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 import Toybox.Graphics;
@@ -23,14 +24,16 @@ import Toybox.ActivityMonitor;
 import Toybox.SensorHistory;
 import Toybox.Timer;
 import Toybox.Math;
+import Toybox.System;
+import Toybox.Weather;
 using Toybox.Time;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Color theme (property colorMode: 0 = dark, 1 = light)
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 module Theme {
-
     const MODE_DARK  = 0;
     const MODE_LIGHT = 1;
 
@@ -60,14 +63,13 @@ module Theme {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Clock digits — per-digit Black Ops One bitmap sprites (32×42 px)
+// Clock digits — proportional Noto Kufi Arabic-Indic sprites
+
 // ─────────────────────────────────────────────────────────────────────────────
+
 module ClockDigits {
-
     const GAP = 2;   // px between digit cells
-
     var cachedColorMode = -1;
-
     var digit0 = null;
     var digit1 = null;
     var digit2 = null;
@@ -158,18 +160,8 @@ module ClockDigits {
         return null;
     }
 
-    function digitWidth() as Number {
-        return digit0.getWidth();
-    }
-
     function digitHeight() as Number {
         return digit0.getHeight();
-    }
-
-    function measureTextWidth(text as String) as Number {
-        var n = text.length();
-        if (n <= 0) { return 0; }
-        return n * digitWidth() + (n - 1) * GAP;
     }
 
     function charToDigit(ch as String) as Number {
@@ -186,21 +178,35 @@ module ClockDigits {
         return -1;
     }
 
-    function drawText(dc, text as String, cx, yTop) as Void {
-        var totalW = measureTextWidth(text);
-        var x = cx - totalW / 2;
-        var step = digitWidth() + GAP;
-        var len  = text.length();
+    function measureTextWidth(text as String) as Number {
+        var n = text.length();
+        var w = 0;
+        var seen = false;
+        for (var i = 0; i < n; i++) {
+            var d = charToDigit(text.substring(i, i + 1));
+            if (d < 0) { continue; }
+            var bmp = bitmapForDigit(d);
+            if (bmp == null) { continue; }
+            if (seen) { w += GAP; }
+            w += bmp.getWidth();
+            seen = true;
+        }
+        return w;
+    }
 
+    function drawText(dc, text as String, cx, yTop) as Void {
+        var x = cx - measureTextWidth(text) / 2;
+        var len = text.length();
+        var seen = false;
         for (var i = 0; i < len; i++) {
             var d = charToDigit(text.substring(i, i + 1));
-            if (d >= 0) {
-                var bmp = bitmapForDigit(d);
-                if (bmp != null) {
-                    dc.drawBitmap(x, yTop, bmp);
-                }
-            }
-            x += step;
+            if (d < 0) { continue; }
+            var bmp = bitmapForDigit(d);
+            if (bmp == null) { continue; }
+            if (seen) { x += GAP; }
+            dc.drawBitmap(x, yTop, bmp);
+            x += bmp.getWidth();
+            seen = true;
         }
     }
 
@@ -213,14 +219,248 @@ module ClockDigits {
         var totalH = stackHeight(stackGap);
         var hourY  = cyCenter - totalH / 2;
         var minY   = hourY + rowH + stackGap;
-
         drawText(dc, hourStr, cx, hourY);
         drawText(dc, minStr, cx, minY);
     }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Small Arabic-Indic glyphs — dates, porthole, temperature
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+module SmallDigits {
+    const GAP = 1;
+    var cachedColorMode = -1;
+    var digit0 = null;
+    var digit1 = null;
+    var digit2 = null;
+    var digit3 = null;
+    var digit4 = null;
+    var digit5 = null;
+    var digit6 = null;
+    var digit7 = null;
+    var digit8 = null;
+    var digit9 = null;
+    var minus = null;
+    var degree = null;
+    var meem = null;
+
+    function loadDigit(d as Number, mode as Number) as BitmapResource {
+        switch (d) {
+            case 0: return WatchUi.loadResource(Theme.pickResource(Rez.Drawables.sm_0, Rez.Drawables.sm_0_light, mode)) as BitmapResource;
+            case 1: return WatchUi.loadResource(Theme.pickResource(Rez.Drawables.sm_1, Rez.Drawables.sm_1_light, mode)) as BitmapResource;
+            case 2: return WatchUi.loadResource(Theme.pickResource(Rez.Drawables.sm_2, Rez.Drawables.sm_2_light, mode)) as BitmapResource;
+            case 3: return WatchUi.loadResource(Theme.pickResource(Rez.Drawables.sm_3, Rez.Drawables.sm_3_light, mode)) as BitmapResource;
+            case 4: return WatchUi.loadResource(Theme.pickResource(Rez.Drawables.sm_4, Rez.Drawables.sm_4_light, mode)) as BitmapResource;
+            case 5: return WatchUi.loadResource(Theme.pickResource(Rez.Drawables.sm_5, Rez.Drawables.sm_5_light, mode)) as BitmapResource;
+            case 6: return WatchUi.loadResource(Theme.pickResource(Rez.Drawables.sm_6, Rez.Drawables.sm_6_light, mode)) as BitmapResource;
+            case 7: return WatchUi.loadResource(Theme.pickResource(Rez.Drawables.sm_7, Rez.Drawables.sm_7_light, mode)) as BitmapResource;
+            case 8: return WatchUi.loadResource(Theme.pickResource(Rez.Drawables.sm_8, Rez.Drawables.sm_8_light, mode)) as BitmapResource;
+            case 9: return WatchUi.loadResource(Theme.pickResource(Rez.Drawables.sm_9, Rez.Drawables.sm_9_light, mode)) as BitmapResource;
+        }
+        return digit0;
+    }
+
+    function ensure(mode as Number) as Void {
+        if (digit0 != null && cachedColorMode == mode) { return; }
+        cachedColorMode = mode;
+        digit0 = loadDigit(0, mode);
+        digit1 = loadDigit(1, mode);
+        digit2 = loadDigit(2, mode);
+        digit3 = loadDigit(3, mode);
+        digit4 = loadDigit(4, mode);
+        digit5 = loadDigit(5, mode);
+        digit6 = loadDigit(6, mode);
+        digit7 = loadDigit(7, mode);
+        digit8 = loadDigit(8, mode);
+        digit9 = loadDigit(9, mode);
+        minus = WatchUi.loadResource(Theme.pickResource(Rez.Drawables.sm_minus, Rez.Drawables.sm_minus_light, mode)) as BitmapResource;
+        degree = WatchUi.loadResource(Theme.pickResource(Rez.Drawables.sm_degree, Rez.Drawables.sm_degree_light, mode)) as BitmapResource;
+        meem = WatchUi.loadResource(Theme.pickResource(Rez.Drawables.sm_meem, Rez.Drawables.sm_meem_light, mode)) as BitmapResource;
+    }
+
+    function bitmapForDigit(d as Number) as BitmapResource or Null {
+        switch (d) {
+            case 0: return digit0;
+            case 1: return digit1;
+            case 2: return digit2;
+            case 3: return digit3;
+            case 4: return digit4;
+            case 5: return digit5;
+            case 6: return digit6;
+            case 7: return digit7;
+            case 8: return digit8;
+            case 9: return digit9;
+        }
+        return null;
+    }
+
+    function glyphHeight() as Number {
+        return digit0.getHeight();
+    }
+
+    function charToDigit(ch as String) as Number {
+        if (ch.equals("0")) { return 0; }
+        if (ch.equals("1")) { return 1; }
+        if (ch.equals("2")) { return 2; }
+        if (ch.equals("3")) { return 3; }
+        if (ch.equals("4")) { return 4; }
+        if (ch.equals("5")) { return 5; }
+        if (ch.equals("6")) { return 6; }
+        if (ch.equals("7")) { return 7; }
+        if (ch.equals("8")) { return 8; }
+        if (ch.equals("9")) { return 9; }
+        return -1;
+    }
+
+    function glyphForChar(ch as String) as BitmapResource or Null {
+        if (ch.equals("-")) { return minus; }
+        var d = charToDigit(ch);
+        if (d < 0) { return null; }
+        return bitmapForDigit(d);
+    }
+
+    function measureAscii(text as String) as Number {
+        var n = text.length();
+        var w = 0;
+        var seen = false;
+        for (var i = 0; i < n; i++) {
+            var bmp = glyphForChar(text.substring(i, i + 1));
+            if (bmp == null) { continue; }
+            if (seen) { w += GAP; }
+            w += bmp.getWidth();
+            seen = true;
+        }
+        return w;
+    }
+
+    function drawAsciiLeft(dc, text as String, x, yTop) as Number {
+        var n = text.length();
+        var seen = false;
+        for (var i = 0; i < n; i++) {
+            var bmp = glyphForChar(text.substring(i, i + 1));
+            if (bmp == null) { continue; }
+            if (seen) { x += GAP; }
+            dc.drawBitmap(x, yTop, bmp);
+            x += bmp.getWidth();
+            seen = true;
+        }
+        return x;
+    }
+
+    function drawAsciiCentered(dc, text as String, cx, yMid) as Void {
+        var yTop = yMid - glyphHeight() / 2;
+        drawAsciiLeft(dc, text, cx - measureAscii(text) / 2, yTop);
+    }
+
+    function blit(dc, bmp as BitmapResource, x, yMid) as Number {
+        dc.drawBitmap(x, yMid - bmp.getHeight() / 2, bmp);
+        return x + bmp.getWidth() + GAP;
+    }
+
+    function drawTemp(dc, celsius as Number or Null, cx, yMid) as Void {
+        var numStr = "--";
+        if (celsius != null) {
+            numStr = (celsius as Number).format("%d");
+        }
+        var w = measureAscii(numStr) + GAP + degree.getWidth() + GAP + meem.getWidth();
+        var x = cx - w / 2;
+        x = drawAsciiLeft(dc, numStr, x, yMid - glyphHeight() / 2);
+        x += GAP;
+        x = blit(dc, degree, x, yMid);
+        blit(dc, meem, x, yMid);
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Arabic month and weekday bitmaps (current values only)
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+module ArabicLabels {
+    var cachedMode = -1;
+    var cachedHijriMonth = -1;
+    var cachedGregMonth = -1;
+    var cachedDow = -1;
+    var hijriBmp = null;
+    var gregBmp = null;
+    var dowBmp = null;
+
+    function hijriId(month as Number, mode as Number) as ResourceId {
+        switch (month) {
+            case 1:  return Theme.pickResource(Rez.Drawables.hijri_1, Rez.Drawables.hijri_1_light, mode);
+            case 2:  return Theme.pickResource(Rez.Drawables.hijri_2, Rez.Drawables.hijri_2_light, mode);
+            case 3:  return Theme.pickResource(Rez.Drawables.hijri_3, Rez.Drawables.hijri_3_light, mode);
+            case 4:  return Theme.pickResource(Rez.Drawables.hijri_4, Rez.Drawables.hijri_4_light, mode);
+            case 5:  return Theme.pickResource(Rez.Drawables.hijri_5, Rez.Drawables.hijri_5_light, mode);
+            case 6:  return Theme.pickResource(Rez.Drawables.hijri_6, Rez.Drawables.hijri_6_light, mode);
+            case 7:  return Theme.pickResource(Rez.Drawables.hijri_7, Rez.Drawables.hijri_7_light, mode);
+            case 8:  return Theme.pickResource(Rez.Drawables.hijri_8, Rez.Drawables.hijri_8_light, mode);
+            case 9:  return Theme.pickResource(Rez.Drawables.hijri_9, Rez.Drawables.hijri_9_light, mode);
+            case 10: return Theme.pickResource(Rez.Drawables.hijri_10, Rez.Drawables.hijri_10_light, mode);
+            case 11: return Theme.pickResource(Rez.Drawables.hijri_11, Rez.Drawables.hijri_11_light, mode);
+            default: return Theme.pickResource(Rez.Drawables.hijri_12, Rez.Drawables.hijri_12_light, mode);
+        }
+    }
+
+    function gregId(month as Number, mode as Number) as ResourceId {
+        switch (month) {
+            case 1:  return Theme.pickResource(Rez.Drawables.greg_1, Rez.Drawables.greg_1_light, mode);
+            case 2:  return Theme.pickResource(Rez.Drawables.greg_2, Rez.Drawables.greg_2_light, mode);
+            case 3:  return Theme.pickResource(Rez.Drawables.greg_3, Rez.Drawables.greg_3_light, mode);
+            case 4:  return Theme.pickResource(Rez.Drawables.greg_4, Rez.Drawables.greg_4_light, mode);
+            case 5:  return Theme.pickResource(Rez.Drawables.greg_5, Rez.Drawables.greg_5_light, mode);
+            case 6:  return Theme.pickResource(Rez.Drawables.greg_6, Rez.Drawables.greg_6_light, mode);
+            case 7:  return Theme.pickResource(Rez.Drawables.greg_7, Rez.Drawables.greg_7_light, mode);
+            case 8:  return Theme.pickResource(Rez.Drawables.greg_8, Rez.Drawables.greg_8_light, mode);
+            case 9:  return Theme.pickResource(Rez.Drawables.greg_9, Rez.Drawables.greg_9_light, mode);
+            case 10: return Theme.pickResource(Rez.Drawables.greg_10, Rez.Drawables.greg_10_light, mode);
+            case 11: return Theme.pickResource(Rez.Drawables.greg_11, Rez.Drawables.greg_11_light, mode);
+            default: return Theme.pickResource(Rez.Drawables.greg_12, Rez.Drawables.greg_12_light, mode);
+        }
+    }
+
+    function dowId(dayOfWeek as Number, mode as Number) as ResourceId {
+        switch (dayOfWeek) {
+            case 1: return Theme.pickResource(Rez.Drawables.dow_1, Rez.Drawables.dow_1_light, mode);
+            case 2: return Theme.pickResource(Rez.Drawables.dow_2, Rez.Drawables.dow_2_light, mode);
+            case 3: return Theme.pickResource(Rez.Drawables.dow_3, Rez.Drawables.dow_3_light, mode);
+            case 4: return Theme.pickResource(Rez.Drawables.dow_4, Rez.Drawables.dow_4_light, mode);
+            case 5: return Theme.pickResource(Rez.Drawables.dow_5, Rez.Drawables.dow_5_light, mode);
+            case 6: return Theme.pickResource(Rez.Drawables.dow_6, Rez.Drawables.dow_6_light, mode);
+            default: return Theme.pickResource(Rez.Drawables.dow_7, Rez.Drawables.dow_7_light, mode);
+        }
+    }
+
+    function ensure(hijriMonth as Number, gregMonth as Number, dayOfWeek as Number, mode as Number) as Void {
+        if (cachedMode != mode) {
+            hijriBmp = null;
+            gregBmp = null;
+            dowBmp = null;
+            cachedHijriMonth = -1;
+            cachedGregMonth = -1;
+            cachedDow = -1;
+            cachedMode = mode;
+        }
+        if (hijriBmp == null || cachedHijriMonth != hijriMonth) {
+            hijriBmp = WatchUi.loadResource(hijriId(hijriMonth, mode)) as BitmapResource;
+            cachedHijriMonth = hijriMonth;
+        }
+        if (gregBmp == null || cachedGregMonth != gregMonth) {
+            gregBmp = WatchUi.loadResource(gregId(gregMonth, mode)) as BitmapResource;
+            cachedGregMonth = gregMonth;
+        }
+        if (dowBmp == null || cachedDow != dayOfWeek) {
+            dowBmp = WatchUi.loadResource(dowId(dayOfWeek, mode)) as BitmapResource;
+            cachedDow = dayOfWeek;
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Hijri calendar helpers
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 module HijriHelpers {
@@ -247,13 +487,11 @@ module HijriHelpers {
         var z   = jd - epochAstro;
         var cyc = Math.floor(z / cycle.toFloat());
         z = z - cycle * cyc;
-
         var j  = Math.floor((z - shift1) / iyear);
         var iy = 30 * cyc + j;
         z = z - Math.floor(j * iyear + shift1);
         var im = Math.floor((z + 28.5001) / 29.5);
         if (im == 13) { im = 12; }
-
         var id = z - Math.floor(29.5001 * im - 29);
         return { :year => iy, :month => im, :day => id };
     }
@@ -262,59 +500,11 @@ module HijriHelpers {
         var jd = gregorianToJulianDay(year, month, day) + dayOffset;
         return julianDayToHijri(jd);
     }
-
-    function hijriMonthName(month as Number) as String {
-        switch (month) {
-            case 1:  return "MUHARR";
-            case 2:  return "SAFAR";
-            case 3:  return "RAB AWL";
-            case 4:  return "RAB THN";
-            case 5:  return "JUM AWL";
-            case 6:  return "JUM THN";
-            case 7:  return "RAJAB";
-            case 8:  return "SHABAN";
-            case 9:  return "RAMADAN";
-            case 10: return "SHAWWAL";
-            case 11: return "DHU QID";
-            case 12: return "DHU HIJ";
-            default: return "-------";
-        }
-    }
-
-    function weekdayAbbr(dayOfWeek as Number) as String {
-        switch (dayOfWeek) {
-            case 1: return "SUN";
-            case 2: return "MON";
-            case 3: return "TUE";
-            case 4: return "WED";
-            case 5: return "THU";
-            case 6: return "FRI";
-            case 7: return "SAT";
-            default: return "---";
-        }
-    }
-
-    function gregorianMonthName(month as Number) as String {
-        switch (month) {
-            case 1:  return "JAN";
-            case 2:  return "FEB";
-            case 3:  return "MAR";
-            case 4:  return "APR";
-            case 5:  return "MAY";
-            case 6:  return "JUN";
-            case 7:  return "JUL";
-            case 8:  return "AUG";
-            case 9:  return "SEP";
-            case 10: return "OCT";
-            case 11: return "NOV";
-            case 12: return "DEC";
-            default: return "---";
-        }
-    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Time formatting helpers
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 module TimeHelpers {
@@ -325,18 +515,15 @@ module TimeHelpers {
             :min  => clockTime.min.format("%02d")
         };
     }
-
-    function formatHm(moment) as String {
-        var info = Gregorian.info(moment, Time.FORMAT_SHORT);
-        return info.hour.format("%02d") + ":" + info.min.format("%02d");
-    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Settings menus – root, Hijri offset, color theme
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 class WatchfaceSettingsMenu extends WatchUi.Menu2 {
+
     function initialize() {
         Menu2.initialize({ :title => "Watch face settings" });
         addItem(new WatchUi.MenuItem("Hijri date shift", null, 0, {}));
@@ -345,6 +532,7 @@ class WatchfaceSettingsMenu extends WatchUi.Menu2 {
 }
 
 class WatchfaceSettingsDelegate extends WatchUi.Menu2InputDelegate {
+
     function initialize() {
         Menu2InputDelegate.initialize();
     }
@@ -370,6 +558,7 @@ class WatchfaceSettingsDelegate extends WatchUi.Menu2InputDelegate {
 }
 
 class ColorThemeSettingsMenu extends WatchUi.Menu2 {
+
     function initialize() {
         Menu2.initialize({ :title => "Color theme" });
         addItem(new WatchUi.MenuItem("Dark", "Default", 0, {}));
@@ -378,6 +567,7 @@ class ColorThemeSettingsMenu extends WatchUi.Menu2 {
 }
 
 class ColorThemeMenuDelegate extends WatchUi.Menu2InputDelegate {
+
     function initialize() {
         Menu2InputDelegate.initialize();
     }
@@ -392,6 +582,7 @@ class ColorThemeMenuDelegate extends WatchUi.Menu2InputDelegate {
 }
 
 class HijriOffsetSettingsMenu extends WatchUi.Menu2 {
+
     function initialize() {
         Menu2.initialize({ :title => "Hijri date shift" });
         addItem(new WatchUi.MenuItem("-2 days",     "Earlier (moon)", 0, {}));
@@ -403,6 +594,7 @@ class HijriOffsetSettingsMenu extends WatchUi.Menu2 {
 }
 
 class HijriOffsetMenuDelegate extends WatchUi.Menu2InputDelegate {
+
     function initialize() {
         Menu2InputDelegate.initialize();
     }
@@ -419,9 +611,11 @@ class HijriOffsetMenuDelegate extends WatchUi.Menu2InputDelegate {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // App entry point
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 class MyProjectApp extends Application.AppBase {
+
     function initialize() {
         AppBase.initialize();
     }
@@ -441,48 +635,37 @@ class MyProjectApp extends Application.AppBase {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Watch-face view
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 class MyWatchFace extends WatchUi.WatchFace {
-
     var timer;
     const HEART_RATE_PLACEHOLDER = "--";
     var cachedHrDisplay = HEART_RATE_PLACEHOLDER;
-
     var lastWeatherFetchTime     = 0;
     var cachedConditions         = null;
     const WEATHER_UPDATE_INTERVAL = 15 * 60;
-
     var lastSystemStatsFetchTime = 0;
     var cachedSystemStats        = null;
     const SYSTEM_STATS_UPDATE_INTERVAL = 5 * 60;
-
     var cachedSteps = 0;
     var cachedBodyBattery = null;
-
     var cachedGregorianInfo = null;
-    var cachedSunrise = null;
-    var cachedSunset  = null;
-    var iconHeart = null;
-    var iconSteps = null;
-    var cachedWeatherIcon = null;
-    var cachedWeatherKey = -1;
     var loadedAssetColorMode = -1;
-
     // Porthole layout
     const PORTHOLE_CX = 144;
     const Y_PORTHOLE_HR = 20;
-    const Y_PORTHOLE_STEPS = 40;
-    const PORTHOLE_ICON_GAP = 2;
+    const Y_PORTHOLE_STEPS = 44;
     const Y_PORTHOLE_BOTTOM = 70;
-
     // Vertical layout constants (pixels from top of 176 px display)
     const CY_TIME         = 64;
     const TIME_STACK_GAP  = 4;
     const TIME_CX_OFFSET  = -26;
-    const Y_SUN_ROW       = 114;
-    const Y_HIJRI         = 132;
-    const Y_GREGORIAN     = 150;
+    const Y_TEMP          = 92;
+    const Y_WEEKDAY       = 116;
+    const Y_HIJRI         = 138;
+    const Y_GREGORIAN     = 156;
+    const DATE_MONTH_GAP  = 6;
     const Y_BATTERY_BAR = 172;
     const H_BATTERY_BAR = 4;
     const X_BODY_BATTERY_BAR = 4;
@@ -495,23 +678,10 @@ class MyWatchFace extends WatchUi.WatchFace {
         timer = new Timer.Timer();
     }
 
-    function reloadThemedBitmaps(mode as Number) as Void {
-        iconHeart = WatchUi.loadResource(
-            Theme.pickResource(Rez.Drawables.icon_heart, Rez.Drawables.icon_heart_light, mode)
-        ) as BitmapResource;
-        iconSteps = WatchUi.loadResource(
-            Theme.pickResource(Rez.Drawables.icon_steps, Rez.Drawables.icon_steps_light, mode)
-        ) as BitmapResource;
-        cachedWeatherIcon = null;
-        cachedWeatherKey = -1;
-        loadedAssetColorMode = mode;
-    }
-
     function ensureThemeAssets(mode as Number) as Void {
         ClockDigits.ensure(mode);
-        if (loadedAssetColorMode != mode) {
-            reloadThemedBitmaps(mode);
-        }
+        SmallDigits.ensure(mode);
+        loadedAssetColorMode = mode;
     }
 
     function onShow() {
@@ -538,6 +708,7 @@ class MyWatchFace extends WatchUi.WatchFace {
 
     // ─────────────────────────────────────────────────────────────────────────
     // Per-minute update – refresh all cached data, then request a redraw
+
     // ─────────────────────────────────────────────────────────────────────────
 
     function onMinuteUiTick() as Void {
@@ -552,16 +723,7 @@ class MyWatchFace extends WatchUi.WatchFace {
                     lastWeatherFetchTime = now;
                 }
             }
-            if (Weather has :getSunrise && cachedConditions != null) {
-                var pos = cachedConditions.observationLocationPosition;
-                if (pos != null) {
-                    var today = Time.now();
-                    cachedSunrise = Weather.getSunrise(pos, today);
-                    cachedSunset  = Weather.getSunset(pos, today);
-                }
-            }
         }
-
         updateActivityData();
         refreshCachedHeartRate();
         refreshCachedBodyBattery();
@@ -570,6 +732,7 @@ class MyWatchFace extends WatchUi.WatchFace {
 
     // ─────────────────────────────────────────────────────────────────────────
     // Main draw (once per minute via onMinuteUiTick)
+
     // ─────────────────────────────────────────────────────────────────────────
 
     function onUpdate(dc) {
@@ -578,22 +741,21 @@ class MyWatchFace extends WatchUi.WatchFace {
         var bg = Theme.backgroundForMode(mode);
         var fg = Theme.foregroundForMode(mode);
         var accent = Theme.accentForMode(mode);
-
         dc.setColor(bg, bg);
         dc.clear();
         dc.setColor(fg, Graphics.COLOR_TRANSPARENT);
-
         drawTime(dc);
-        drawWeatherByPorthole(dc, mode, fg);
-        drawPortholeContents(dc, fg);
-        drawSunDayRow(dc, fg);
-        drawCenterDates(dc, fg);
+        drawTemperature(dc);
+        drawPortholeContents(dc);
+        drawWeekday(dc, mode);
+        drawCenterDates(dc, mode);
         drawBodyBatteryBar(dc, fg, accent);
         drawBatteryBar(dc, fg, accent);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
     // ① Time
+
     // ─────────────────────────────────────────────────────────────────────────
 
     function drawTime(dc) {
@@ -601,245 +763,102 @@ class MyWatchFace extends WatchUi.WatchFace {
         var hourStr = parts[:hour] as String;
         var minStr  = parts[:min] as String;
         var cx      = dc.getWidth() / 2 + TIME_CX_OFFSET;
-
         ClockDigits.drawStacked24h(dc, hourStr, minStr, cx, CY_TIME, TIME_STACK_GAP);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // ② Weather under porthole — 24×24 icon + FONT_TINY temp
+    // ② Temperature under porthole
+
     // ─────────────────────────────────────────────────────────────────────────
 
-    function getWeatherIconResource(conditionCode as Number, mode as Number) as ResourceId {
-        switch (conditionCode) {
-            case 0:  // CLEAR
-            case 22: // PARTLY_CLEAR
-            case 23: // MOSTLY_CLEAR
-            case 40: // FAIR
-                return Theme.pickResource(
-                    Rez.Drawables.weather_clear, Rez.Drawables.weather_clear_light, mode
-                );
-
-            case 1:  // PARTLY_CLOUDY
-            case 2:  // MOSTLY_CLOUDY
-            case 52: // THIN_CLOUDS
-                return Theme.pickResource(
-                    Rez.Drawables.weather_partly_cloudy, Rez.Drawables.weather_partly_cloudy_light, mode
-                );
-
-            case 5:  // WINDY
-            case 36: // SQUALL
-                return Theme.pickResource(
-                    Rez.Drawables.weather_wind, Rez.Drawables.weather_wind_light, mode
-                );
-
-            case 3:  // RAIN
-            case 11: // SCATTERED_SHOWERS
-            case 13: // FREEZING_RAIN
-            case 14: // LIGHT_RAIN
-            case 15: // HEAVY_RAIN
-            case 24: // FREEZING_DRIZZLE
-            case 25: // LIGHT_SHOWERS
-            case 26: // SHOWERS
-            case 27: // HEAVY_SHOWERS
-            case 31: // DRIZZLE
-            case 45: // RAIN_AND_SNOW
-            case 49: // SLEET
-                return Theme.pickResource(
-                    Rez.Drawables.weather_rain, Rez.Drawables.weather_rain_light, mode
-                );
-
-            case 6:  // THUNDERSTORMS
-            case 10: // HAIL
-            case 12: // SCATTERED_THUNDERSTORMS
-            case 28: // THUNDERSTORM
-            case 32: // TORNADO
-            case 38: // VOLCANIC_ASH
-            case 41: // HURRICANE
-            case 42: // TROPICAL_STORM
-                return Theme.pickResource(
-                    Rez.Drawables.weather_storm, Rez.Drawables.weather_storm_light, mode
-                );
-
-            case 4:  // SNOW
-            case 7:  // WINTRY_MIX
-            case 16: // LIGHT_SNOW
-            case 17: // HEAVY_SNOW
-            case 18: // SCATTERED_SNOW
-            case 19: // HEAVY_SCATTERED_SNOW
-            case 21: // SNOW_AND_RAIN
-            case 34: // ICE
-            case 43: // BLIZZARD
-            case 44: // SCATTERED_SNOW_SHOWERS
-            case 46: // SNOW_SHOWERS
-            case 47: // HEAVY_SNOW_SHOWERS
-            case 48: // FLURRIES
-            case 50: // SCATTERED_FLURRIES
-            case 51: // HEAVY_SCATTERED_FLURRIES
-                return Theme.pickResource(
-                    Rez.Drawables.weather_snow, Rez.Drawables.weather_snow_light, mode
-                );
-
-            case 8:  // FOG
-            case 9:  // HAZY
-            case 20: // CLOUDY
-            case 29: // MIST
-            case 30: // DUST
-            case 33: // SMOKE
-            case 35: // SAND
-            case 37: // SANDSTORM
-            case 39: // HAZE
-            case 53: // UNKNOWN
-            default:
-                return Theme.pickResource(
-                    Rez.Drawables.weather_cloudy, Rez.Drawables.weather_cloudy_light, mode
-                );
+    function drawTemperature(dc) {
+        var celsius = null;
+        if (Toybox has :Weather && cachedConditions != null && cachedConditions.temperature != null) {
+            celsius = cachedConditions.temperature.toFloat().toNumber();
         }
+        SmallDigits.drawTemp(dc, celsius, PORTHOLE_CX, Y_TEMP);
     }
 
-    function getCachedWeatherIcon(conditionCode as Number, mode as Number) as BitmapResource {
-        var key = mode * 1000 + conditionCode;
-        if (cachedWeatherIcon != null && cachedWeatherKey == key) {
-            return cachedWeatherIcon;
-        }
-        cachedWeatherIcon = WatchUi.loadResource(
-            getWeatherIconResource(conditionCode, mode)
-        ) as BitmapResource;
-        cachedWeatherKey = key;
-        return cachedWeatherIcon;
-    }
-
-    function drawWeatherByPorthole(dc, mode as Number, fg as Number) {
-        var tempStr = "--\u00B0C";
-        var conditionCode = -1;
-
-        if (Toybox has :Weather && cachedConditions != null) {
-            if (cachedConditions.temperature != null) {
-                tempStr = cachedConditions.temperature.toFloat().format("%d") + "\u00B0C";
-            }
-            if (cachedConditions.condition != null) {
-                conditionCode = cachedConditions.condition.toNumber();
-            }
-        }
-
-        var icon = getCachedWeatherIcon(conditionCode, mode);
-        var iconW = icon.getWidth();
-        var iconH = icon.getHeight();
-        var dims = dc.getTextDimensions(tempStr, Graphics.FONT_TINY);
-        var textW = dims[0];
-        var gap = 4;
-        var totalW = iconW + gap + textW;
-        var leftX = PORTHOLE_CX - totalW / 2;
-        var cy = (Y_PORTHOLE_BOTTOM + Y_SUN_ROW) / 2;
-
-        dc.drawBitmap(leftX, cy - iconH / 2, icon);
-        dc.setColor(fg, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(
-            leftX + iconW + gap,
-            cy,
-            Graphics.FONT_TINY,
-            tempStr,
-            Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER
-        );
-    }
-
-    function drawSunDayRow(dc, fg as Number) {
+    function drawWeekday(dc, mode as Number) {
         var g = cachedGregorianInfo;
         if (g == null) { g = Gregorian.info(Time.now(), Time.FORMAT_SHORT); }
-
-        var sunriseStr = "--:--";
-        var sunsetStr  = "--:--";
-        if (cachedSunrise != null) {
-            sunriseStr = TimeHelpers.formatHm(cachedSunrise);
-        }
-        if (cachedSunset != null) {
-            sunsetStr = TimeHelpers.formatHm(cachedSunset);
-        }
-
-        var line = sunriseStr + "  " +
-                   HijriHelpers.weekdayAbbr(g.day_of_week) + "  " +
-                   sunsetStr;
-
-        dc.setColor(fg, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(
-            dc.getWidth() / 2,
-            Y_SUN_ROW,
-            Graphics.FONT_XTINY,
-            line,
-            Graphics.TEXT_JUSTIFY_CENTER
+        var hijri = HijriHelpers.gregorianToHijri(g.year, g.month, g.day, getHijriDayOffset());
+        ArabicLabels.ensure(
+            hijri[:month].toNumber(),
+            g.month,
+            g.day_of_week,
+            mode
+        );
+        var bmp = ArabicLabels.dowBmp;
+        if (bmp == null) { return; }
+        dc.drawBitmap(
+            dc.getWidth() / 2 - bmp.getWidth() / 2,
+            Y_WEEKDAY - bmp.getHeight() / 2,
+            bmp
         );
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // ③ Porthole contents
+    // ③ Porthole contents — position is the legend (HR top, steps below)
+
     // ─────────────────────────────────────────────────────────────────────────
 
-    function drawPortholeMetric(dc, cx, y, icon as BitmapResource, valueStr as String, fg as Number) as Void {
-        var iconW  = icon.getWidth();
-        var iconH  = icon.getHeight();
-        var dims   = dc.getTextDimensions(valueStr, Graphics.FONT_XTINY);
-        var textW  = dims[0];
-        var totalW = iconW + PORTHOLE_ICON_GAP + textW;
-        var leftX  = cx - totalW / 2;
-        var iconY  = y - iconH / 2;
-
-        dc.drawBitmap(leftX, iconY, icon);
-        dc.setColor(fg, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(
-            leftX + iconW + PORTHOLE_ICON_GAP,
-            y,
-            Graphics.FONT_XTINY,
-            valueStr,
-            Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER
-        );
+    function drawPortholeContents(dc) {
+        SmallDigits.drawAsciiCentered(dc, cachedHrDisplay, PORTHOLE_CX, Y_PORTHOLE_HR);
+        SmallDigits.drawAsciiCentered(dc, cachedSteps.toString(), PORTHOLE_CX, Y_PORTHOLE_STEPS);
     }
 
-    function drawPortholeContents(dc, fg as Number) {
-        drawPortholeMetric(dc, PORTHOLE_CX, Y_PORTHOLE_HR, iconHeart, cachedHrDisplay, fg);
-        drawPortholeMetric(dc, PORTHOLE_CX, Y_PORTHOLE_STEPS, iconSteps, cachedSteps.toString(), fg);
+    function drawDateRow(dc, monthBmp as BitmapResource, dayStr as String, cx, yMid) as Void {
+        var dayW = SmallDigits.measureAscii(dayStr);
+        var dayH = SmallDigits.glyphHeight();
+        var mw = monthBmp.getWidth();
+        var mh = monthBmp.getHeight();
+        var total = mw + DATE_MONTH_GAP + dayW;
+        var x = cx - total / 2;
+        dc.drawBitmap(x, yMid - mh / 2, monthBmp);
+        SmallDigits.drawAsciiLeft(dc, dayStr, x + mw + DATE_MONTH_GAP, yMid - dayH / 2);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
     // ④ Center column below time
+
     // ─────────────────────────────────────────────────────────────────────────
 
-    function drawCenterDates(dc, fg as Number) {
+    function drawCenterDates(dc, mode as Number) {
         var cx = dc.getWidth() / 2;
         var g = cachedGregorianInfo;
         if (g == null) { g = Gregorian.info(Time.now(), Time.FORMAT_SHORT); }
-
-        var hijri    = HijriHelpers.gregorianToHijri(g.year, g.month, g.day, getHijriDayOffset());
-        var hijriDay = hijri[:day].toNumber().format("%02d");
-        var hijriMon = HijriHelpers.hijriMonthName(hijri[:month].toNumber());
-        var hijriYr  = hijri[:year].toNumber().toString();
-        var hijriLine = hijriDay + " " + hijriMon + " " + hijriYr;
-
-        var gregorianLine = g.day.format("%02d") + " " +
-                            HijriHelpers.gregorianMonthName(g.month) + " " +
-                            g.year.toString();
-
-        dc.setColor(fg, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, Y_HIJRI,     Graphics.FONT_XTINY, hijriLine,     Graphics.TEXT_JUSTIFY_CENTER);
-        dc.drawText(cx, Y_GREGORIAN, Graphics.FONT_XTINY, gregorianLine, Graphics.TEXT_JUSTIFY_CENTER);
+        var hijri = HijriHelpers.gregorianToHijri(g.year, g.month, g.day, getHijriDayOffset());
+        ArabicLabels.ensure(
+            hijri[:month].toNumber(),
+            g.month,
+            g.day_of_week,
+            mode
+        );
+        if (ArabicLabels.hijriBmp != null) {
+            drawDateRow(dc, ArabicLabels.hijriBmp, hijri[:day].toNumber().format("%02d"), cx, Y_HIJRI);
+        }
+        if (ArabicLabels.gregBmp != null) {
+            drawDateRow(dc, ArabicLabels.gregBmp, g.day.format("%02d"), cx, Y_GREGORIAN);
+        }
     }
 
     // ─────────────────────────────────────────────────────────────────────────
     // ⑤ Body battery bar (left edge)
+
     // ─────────────────────────────────────────────────────────────────────────
 
     function drawBodyBatteryBar(dc, fg as Number, accent as Number) {
         var barH = Y_BATTERY_BAR;
         var bbValue = null;
-
         if (DEBUG_BODY_BATTERY >= 0) {
             bbValue = DEBUG_BODY_BATTERY;
         } else if (cachedBodyBattery != null) {
             bbValue = cachedBodyBattery;
         }
-
         dc.setPenWidth(1);
         dc.setColor(accent, Graphics.COLOR_TRANSPARENT);
         dc.drawRectangle(X_BODY_BATTERY_BAR, 0, W_BODY_BATTERY_BAR, barH);
-
         if (bbValue != null && bbValue > 0) {
             var fillH = (barH.toFloat() * bbValue.toFloat() / 100.0).toNumber();
             if (fillH < MIN_BB_FILL_PX) {
@@ -848,7 +867,6 @@ class MyWatchFace extends WatchUi.WatchFace {
             if (fillH > barH) {
                 fillH = barH;
             }
-
             dc.setColor(fg, Graphics.COLOR_TRANSPARENT);
             dc.fillRectangle(X_BODY_BATTERY_BAR, barH - fillH, W_BODY_BATTERY_BAR, fillH);
         }
@@ -856,6 +874,7 @@ class MyWatchFace extends WatchUi.WatchFace {
 
     // ─────────────────────────────────────────────────────────────────────────
     // ⑥ Battery bar
+
     // ─────────────────────────────────────────────────────────────────────────
 
     function drawBatteryBar(dc, fg as Number, accent as Number) {
@@ -865,10 +884,8 @@ class MyWatchFace extends WatchUi.WatchFace {
             pct = cachedSystemStats.battery.toFloat() / 100.0;
         }
         var fillW = (w.toFloat() * pct).toNumber();
-
         dc.setColor(accent, Graphics.COLOR_TRANSPARENT);
         dc.fillRectangle(0, Y_BATTERY_BAR, w, H_BATTERY_BAR);
-
         if (fillW > 0) {
             dc.setColor(fg, Graphics.COLOR_TRANSPARENT);
             dc.fillRectangle(0, Y_BATTERY_BAR, fillW, H_BATTERY_BAR);
@@ -877,6 +894,7 @@ class MyWatchFace extends WatchUi.WatchFace {
 
     // ─────────────────────────────────────────────────────────────────────────
     // Data helpers
+
     // ─────────────────────────────────────────────────────────────────────────
 
     function getHijriDayOffset() as Number {
@@ -919,13 +937,11 @@ class MyWatchFace extends WatchUi.WatchFace {
             }
             sample = iter.next();
         }
-
         var info = Activity.getActivityInfo();
         if (info != null && info.currentHeartRate != null) {
             cachedHrDisplay = info.currentHeartRate.toString();
             return;
         }
-
         if ((Toybox has :SensorHistory) && (SensorHistory has :getHeartRateHistory)) {
             var hrIter = SensorHistory.getHeartRateHistory({
                 :period => 1,
@@ -939,7 +955,6 @@ class MyWatchFace extends WatchUi.WatchFace {
                 }
             }
         }
-
         cachedHrDisplay = HEART_RATE_PLACEHOLDER;
     }
 
@@ -947,7 +962,6 @@ class MyWatchFace extends WatchUi.WatchFace {
         if (iter == null) {
             return null;
         }
-
         var sample = iter.next();
         while (sample != null) {
             if (sample.data != null) {
@@ -966,21 +980,17 @@ class MyWatchFace extends WatchUi.WatchFace {
         if (DEBUG_BODY_BATTERY >= 0) {
             return;
         }
-
         cachedBodyBattery = null;
         if (!(Toybox has :SensorHistory) || !(SensorHistory has :getBodyBatteryHistory)) {
             return;
         }
-
         var bb = readBodyBatteryFromIterator(SensorHistory.getBodyBatteryHistory({
             :period => 1,
             :order  => SensorHistory.ORDER_NEWEST_FIRST
         }));
-
         if (bb == null) {
             bb = readBodyBatteryFromIterator(SensorHistory.getBodyBatteryHistory({}));
         }
-
         cachedBodyBattery = bb;
     }
 }
