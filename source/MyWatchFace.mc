@@ -1,16 +1,28 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// MyWatchFace.mc  –  Garmin Instinct 2X / 3 Solar Optimized
+// MyWatchFace.mc  –  Garmin Instinct 3 Solar 45 mm
 //
 // Layout (top → bottom):
-//   Porthole      │  upper-right  →  HR (top)  ·  steps (center)  ·  numbers only
-//   TIME          │  stacked HH/MM, Noto Kufi Arabic-Indic digits, cy≈64
-//   Temperature   │  Arabic-Indic °م · centered under porthole
-//   Weekday       │  full Arabic name bitmap · centered
+//   Porthole      │  HR (upper, xs) · steps (lower, md; xs past 9999), numbers only
+//   TIME          │  stacked HH/MM, tabular Arabic-Indic digits, cy≈59
+//   Temperature   │  م° unit then LTR number · centred on the porthole axis
+//   Weekday       │  full Arabic name bitmap · centred
 //   Hijri date    │  month bitmap + day  (no year)
-//   Gregorian     │  month bitmap + day  (no year)
-//   Battery bar   │  4 px tall · fills from left · proportional to battery %
-//   Body battery  │  4 px wide · left inset · fills bottom-up · 0–100 %
-
+//   Gregorian     │  month bitmap + day  (no year, ~12 % smaller than Hijri)
+//   Battery bar   │  bottom, inset to the panel's visible span
+//   Body battery  │  left edge, inset to the panel's visible span
+//
+// Panel geometry (measured, not assumed):
+//   The display is a 176×176 *semi-octagon*, not a circle. Corners are rounded
+//   chamfers, so the usable span narrows sharply toward the top and bottom. Two
+//   consequences drive the constants below:
+//     · At y=172 only x 38–137 is on-panel, and y=175 does not exist at all.
+//       A bar drawn 0…175 is invisible below 22 % and saturated above 78 %.
+//     · At the Gregorian row's bottom edge (y=166) the panel spans only x 29–146,
+//       which is what caps DATE_SEAM_MAX.
+//
+// Digit tiers are *tabular*: every glyph in a set shares one cell width, so a
+// multi-digit string never changes width as its value changes. Without this the
+// stacked hour and minute rows, centred independently, sat up to 21 px apart.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import Toybox.Graphics;
@@ -30,7 +42,6 @@ using Toybox.Time;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Color theme (property colorMode: 0 = dark, 1 = light)
-
 // ─────────────────────────────────────────────────────────────────────────────
 
 module Theme {
@@ -57,114 +68,74 @@ module Theme {
         return (mode == MODE_LIGHT) ? Graphics.COLOR_BLACK : Graphics.COLOR_WHITE;
     }
 
-    function accentForMode(mode as Number) as Number {
-        return (mode == MODE_LIGHT) ? Graphics.COLOR_LT_GRAY : Graphics.COLOR_DK_GRAY;
-    }
+    // NOTE: this panel is 1 bpp - its palette is black and white only. Any grey
+    // snaps to one of the two, so a "grey track" for the bars renders as either
+    // invisible (dark theme) or solid (light theme). Both bars therefore draw a
+    // foreground outline as their track and fill proportionally inside it.
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Clock digits — proportional Noto Kufi Arabic-Indic sprites
-
+// GlyphSet — one tabular sprite tier
+//
+// Slots 0-9 are the digits and always share a cell width. Slots 10+ are optional
+// symbols that keep their natural width. Callers address symbols through ASCII
+// stand-ins so no source file needs non-ASCII string literals:
+//     '-' → minus     '*' → degree     'm' → meem
 // ─────────────────────────────────────────────────────────────────────────────
 
-module ClockDigits {
-    const GAP = 2;   // px between digit cells
-    var cachedColorMode = -1;
-    var digit0 = null;
-    var digit1 = null;
-    var digit2 = null;
-    var digit3 = null;
-    var digit4 = null;
-    var digit5 = null;
-    var digit6 = null;
-    var digit7 = null;
-    var digit8 = null;
-    var digit9 = null;
+const G_MINUS  = 10;
+const G_DEGREE = 11;
+const G_MEEM   = 12;
 
-    function loadDigit(d as Number, mode as Number) as BitmapResource {
-        switch (d) {
-            case 0:
-                return WatchUi.loadResource(
-                    Theme.pickResource(Rez.Drawables.digit_0, Rez.Drawables.digit_0_light, mode)
-                ) as BitmapResource;
-            case 1:
-                return WatchUi.loadResource(
-                    Theme.pickResource(Rez.Drawables.digit_1, Rez.Drawables.digit_1_light, mode)
-                ) as BitmapResource;
-            case 2:
-                return WatchUi.loadResource(
-                    Theme.pickResource(Rez.Drawables.digit_2, Rez.Drawables.digit_2_light, mode)
-                ) as BitmapResource;
-            case 3:
-                return WatchUi.loadResource(
-                    Theme.pickResource(Rez.Drawables.digit_3, Rez.Drawables.digit_3_light, mode)
-                ) as BitmapResource;
-            case 4:
-                return WatchUi.loadResource(
-                    Theme.pickResource(Rez.Drawables.digit_4, Rez.Drawables.digit_4_light, mode)
-                ) as BitmapResource;
-            case 5:
-                return WatchUi.loadResource(
-                    Theme.pickResource(Rez.Drawables.digit_5, Rez.Drawables.digit_5_light, mode)
-                ) as BitmapResource;
-            case 6:
-                return WatchUi.loadResource(
-                    Theme.pickResource(Rez.Drawables.digit_6, Rez.Drawables.digit_6_light, mode)
-                ) as BitmapResource;
-            case 7:
-                return WatchUi.loadResource(
-                    Theme.pickResource(Rez.Drawables.digit_7, Rez.Drawables.digit_7_light, mode)
-                ) as BitmapResource;
-            case 8:
-                return WatchUi.loadResource(
-                    Theme.pickResource(Rez.Drawables.digit_8, Rez.Drawables.digit_8_light, mode)
-                ) as BitmapResource;
-            case 9:
-                return WatchUi.loadResource(
-                    Theme.pickResource(Rez.Drawables.digit_9, Rez.Drawables.digit_9_light, mode)
-                ) as BitmapResource;
-        }
-        return digit0;
+class GlyphSet {
+    private var _darkIds as Array<ResourceId>;
+    private var _lightIds as Array<ResourceId>;
+    private var _bmps as Array<BitmapResource> or Null;
+    private var _mode as Number;
+    private var _gap as Number;
+
+    function initialize(darkIds as Array<ResourceId>, lightIds as Array<ResourceId>, gap as Number) {
+        _darkIds  = darkIds;
+        _lightIds = lightIds;
+        _gap      = gap;
+        _bmps     = null;
+        _mode     = -1;
     }
 
+    // Lazy: a tier costs nothing until something actually draws with it.
     function ensure(mode as Number) as Void {
-        if (digit0 != null && cachedColorMode == mode) {
+        if (_bmps != null && _mode == mode) {
             return;
         }
-        cachedColorMode = mode;
-        digit0 = loadDigit(0, mode);
-        digit1 = loadDigit(1, mode);
-        digit2 = loadDigit(2, mode);
-        digit3 = loadDigit(3, mode);
-        digit4 = loadDigit(4, mode);
-        digit5 = loadDigit(5, mode);
-        digit6 = loadDigit(6, mode);
-        digit7 = loadDigit(7, mode);
-        digit8 = loadDigit(8, mode);
-        digit9 = loadDigit(9, mode);
-    }
-
-    function bitmapForDigit(d as Number) as BitmapResource or Null {
-        switch (d) {
-            case 0: return digit0;
-            case 1: return digit1;
-            case 2: return digit2;
-            case 3: return digit3;
-            case 4: return digit4;
-            case 5: return digit5;
-            case 6: return digit6;
-            case 7: return digit7;
-            case 8: return digit8;
-            case 9: return digit9;
+        _mode = mode;
+        var src = (mode == Theme.MODE_LIGHT) ? _lightIds : _darkIds;
+        var n = src.size();
+        var b = new Array<BitmapResource>[n];
+        for (var i = 0; i < n; i++) {
+            b[i] = WatchUi.loadResource(src[i]) as BitmapResource;
         }
-        return null;
+        _bmps = b;
     }
 
-    function digitHeight() as Number {
-        return digit0.getHeight();
+    function at(idx as Number) as BitmapResource or Null {
+        var b = _bmps;
+        if (b == null || idx < 0 || idx >= b.size()) {
+            return null;
+        }
+        return b[idx];
     }
 
-    function charToDigit(ch as String) as Number {
+    function cellWidth() as Number {
+        var b = at(0);
+        return (b == null) ? 0 : b.getWidth();
+    }
+
+    function cellHeight() as Number {
+        var b = at(0);
+        return (b == null) ? 0 : b.getHeight();
+    }
+
+    function indexForChar(ch as String) as Number {
         if (ch.equals("0")) { return 0; }
         if (ch.equals("1")) { return 1; }
         if (ch.equals("2")) { return 2; }
@@ -175,173 +146,33 @@ module ClockDigits {
         if (ch.equals("7")) { return 7; }
         if (ch.equals("8")) { return 8; }
         if (ch.equals("9")) { return 9; }
+        if (ch.equals("-")) { return G_MINUS; }
+        if (ch.equals("*")) { return G_DEGREE; }
+        if (ch.equals("m")) { return G_MEEM; }
         return -1;
     }
 
-    function measureTextWidth(text as String) as Number {
+    function measure(text as String) as Number {
         var n = text.length();
         var w = 0;
         var seen = false;
         for (var i = 0; i < n; i++) {
-            var d = charToDigit(text.substring(i, i + 1));
-            if (d < 0) { continue; }
-            var bmp = bitmapForDigit(d);
+            var bmp = at(indexForChar(text.substring(i, i + 1)));
             if (bmp == null) { continue; }
-            if (seen) { w += GAP; }
+            if (seen) { w += _gap; }
             w += bmp.getWidth();
             seen = true;
         }
         return w;
     }
 
-    function drawText(dc, text as String, cx, yTop) as Void {
-        var x = cx - measureTextWidth(text) / 2;
-        var len = text.length();
-        var seen = false;
-        for (var i = 0; i < len; i++) {
-            var d = charToDigit(text.substring(i, i + 1));
-            if (d < 0) { continue; }
-            var bmp = bitmapForDigit(d);
-            if (bmp == null) { continue; }
-            if (seen) { x += GAP; }
-            dc.drawBitmap(x, yTop, bmp);
-            x += bmp.getWidth();
-            seen = true;
-        }
-    }
-
-    function stackHeight(stackGap as Number) as Number {
-        return digitHeight() * 2 + stackGap;
-    }
-
-    function drawStacked24h(dc, hourStr as String, minStr as String, cx, cyCenter, stackGap as Number) as Void {
-        var rowH   = digitHeight();
-        var totalH = stackHeight(stackGap);
-        var hourY  = cyCenter - totalH / 2;
-        var minY   = hourY + rowH + stackGap;
-        drawText(dc, hourStr, cx, hourY);
-        drawText(dc, minStr, cx, minY);
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Small Arabic-Indic glyphs — dates, porthole, temperature
-
-// ─────────────────────────────────────────────────────────────────────────────
-
-module SmallDigits {
-    const GAP = 1;
-    var cachedColorMode = -1;
-    var digit0 = null;
-    var digit1 = null;
-    var digit2 = null;
-    var digit3 = null;
-    var digit4 = null;
-    var digit5 = null;
-    var digit6 = null;
-    var digit7 = null;
-    var digit8 = null;
-    var digit9 = null;
-    var minus = null;
-    var degree = null;
-    var meem = null;
-
-    function loadDigit(d as Number, mode as Number) as BitmapResource {
-        switch (d) {
-            case 0: return WatchUi.loadResource(Theme.pickResource(Rez.Drawables.sm_0, Rez.Drawables.sm_0_light, mode)) as BitmapResource;
-            case 1: return WatchUi.loadResource(Theme.pickResource(Rez.Drawables.sm_1, Rez.Drawables.sm_1_light, mode)) as BitmapResource;
-            case 2: return WatchUi.loadResource(Theme.pickResource(Rez.Drawables.sm_2, Rez.Drawables.sm_2_light, mode)) as BitmapResource;
-            case 3: return WatchUi.loadResource(Theme.pickResource(Rez.Drawables.sm_3, Rez.Drawables.sm_3_light, mode)) as BitmapResource;
-            case 4: return WatchUi.loadResource(Theme.pickResource(Rez.Drawables.sm_4, Rez.Drawables.sm_4_light, mode)) as BitmapResource;
-            case 5: return WatchUi.loadResource(Theme.pickResource(Rez.Drawables.sm_5, Rez.Drawables.sm_5_light, mode)) as BitmapResource;
-            case 6: return WatchUi.loadResource(Theme.pickResource(Rez.Drawables.sm_6, Rez.Drawables.sm_6_light, mode)) as BitmapResource;
-            case 7: return WatchUi.loadResource(Theme.pickResource(Rez.Drawables.sm_7, Rez.Drawables.sm_7_light, mode)) as BitmapResource;
-            case 8: return WatchUi.loadResource(Theme.pickResource(Rez.Drawables.sm_8, Rez.Drawables.sm_8_light, mode)) as BitmapResource;
-            case 9: return WatchUi.loadResource(Theme.pickResource(Rez.Drawables.sm_9, Rez.Drawables.sm_9_light, mode)) as BitmapResource;
-        }
-        return digit0;
-    }
-
-    function ensure(mode as Number) as Void {
-        if (digit0 != null && cachedColorMode == mode) { return; }
-        cachedColorMode = mode;
-        digit0 = loadDigit(0, mode);
-        digit1 = loadDigit(1, mode);
-        digit2 = loadDigit(2, mode);
-        digit3 = loadDigit(3, mode);
-        digit4 = loadDigit(4, mode);
-        digit5 = loadDigit(5, mode);
-        digit6 = loadDigit(6, mode);
-        digit7 = loadDigit(7, mode);
-        digit8 = loadDigit(8, mode);
-        digit9 = loadDigit(9, mode);
-        minus = WatchUi.loadResource(Theme.pickResource(Rez.Drawables.sm_minus, Rez.Drawables.sm_minus_light, mode)) as BitmapResource;
-        degree = WatchUi.loadResource(Theme.pickResource(Rez.Drawables.sm_degree, Rez.Drawables.sm_degree_light, mode)) as BitmapResource;
-        meem = WatchUi.loadResource(Theme.pickResource(Rez.Drawables.sm_meem, Rez.Drawables.sm_meem_light, mode)) as BitmapResource;
-    }
-
-    function bitmapForDigit(d as Number) as BitmapResource or Null {
-        switch (d) {
-            case 0: return digit0;
-            case 1: return digit1;
-            case 2: return digit2;
-            case 3: return digit3;
-            case 4: return digit4;
-            case 5: return digit5;
-            case 6: return digit6;
-            case 7: return digit7;
-            case 8: return digit8;
-            case 9: return digit9;
-        }
-        return null;
-    }
-
-    function glyphHeight() as Number {
-        return digit0.getHeight();
-    }
-
-    function charToDigit(ch as String) as Number {
-        if (ch.equals("0")) { return 0; }
-        if (ch.equals("1")) { return 1; }
-        if (ch.equals("2")) { return 2; }
-        if (ch.equals("3")) { return 3; }
-        if (ch.equals("4")) { return 4; }
-        if (ch.equals("5")) { return 5; }
-        if (ch.equals("6")) { return 6; }
-        if (ch.equals("7")) { return 7; }
-        if (ch.equals("8")) { return 8; }
-        if (ch.equals("9")) { return 9; }
-        return -1;
-    }
-
-    function glyphForChar(ch as String) as BitmapResource or Null {
-        if (ch.equals("-")) { return minus; }
-        var d = charToDigit(ch);
-        if (d < 0) { return null; }
-        return bitmapForDigit(d);
-    }
-
-    function measureAscii(text as String) as Number {
-        var n = text.length();
-        var w = 0;
-        var seen = false;
-        for (var i = 0; i < n; i++) {
-            var bmp = glyphForChar(text.substring(i, i + 1));
-            if (bmp == null) { continue; }
-            if (seen) { w += GAP; }
-            w += bmp.getWidth();
-            seen = true;
-        }
-        return w;
-    }
-
-    function drawAsciiLeft(dc, text as String, x, yTop) as Number {
+    function drawLeft(dc, text as String, x as Number, yTop as Number) as Number {
         var n = text.length();
         var seen = false;
         for (var i = 0; i < n; i++) {
-            var bmp = glyphForChar(text.substring(i, i + 1));
+            var bmp = at(indexForChar(text.substring(i, i + 1)));
             if (bmp == null) { continue; }
-            if (seen) { x += GAP; }
+            if (seen) { x += _gap; }
             dc.drawBitmap(x, yTop, bmp);
             x += bmp.getWidth();
             seen = true;
@@ -349,33 +180,96 @@ module SmallDigits {
         return x;
     }
 
-    function drawAsciiCentered(dc, text as String, cx, yMid) as Void {
-        var yTop = yMid - glyphHeight() / 2;
-        drawAsciiLeft(dc, text, cx - measureAscii(text) / 2, yTop);
+    function drawCentered(dc, text as String, cx as Number, yMid as Number) as Void {
+        drawLeft(dc, text, cx - measure(text) / 2, yMid - cellHeight() / 2);
     }
 
-    function blit(dc, bmp as BitmapResource, x, yMid) as Number {
-        dc.drawBitmap(x, yMid - bmp.getHeight() / 2, bmp);
-        return x + bmp.getWidth() + GAP;
+    // Right-aligned: used for the date rows, where the shared seam is the anchor.
+    function drawRight(dc, text as String, xRight as Number, yMid as Number) as Void {
+        drawLeft(dc, text, xRight - measure(text), yMid - cellHeight() / 2);
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// The four tiers
+//   clock : stacked HH/MM              sm : Hijri day
+//   md    : porthole steps, temperature xs : porthole HR, Gregorian day
+// ─────────────────────────────────────────────────────────────────────────────
+
+module Glyphs {
+    var clock = null;
+    var sm    = null;
+    var md    = null;
+    var xs    = null;
+
+    function build() as Void {
+        clock = new GlyphSet(
+            [Rez.Drawables.digit_0, Rez.Drawables.digit_1, Rez.Drawables.digit_2,
+             Rez.Drawables.digit_3, Rez.Drawables.digit_4, Rez.Drawables.digit_5,
+             Rez.Drawables.digit_6, Rez.Drawables.digit_7, Rez.Drawables.digit_8,
+             Rez.Drawables.digit_9],
+            [Rez.Drawables.digit_0_light, Rez.Drawables.digit_1_light, Rez.Drawables.digit_2_light,
+             Rez.Drawables.digit_3_light, Rez.Drawables.digit_4_light, Rez.Drawables.digit_5_light,
+             Rez.Drawables.digit_6_light, Rez.Drawables.digit_7_light, Rez.Drawables.digit_8_light,
+             Rez.Drawables.digit_9_light],
+            2);
+
+        sm = new GlyphSet(
+            [Rez.Drawables.sm_0, Rez.Drawables.sm_1, Rez.Drawables.sm_2, Rez.Drawables.sm_3,
+             Rez.Drawables.sm_4, Rez.Drawables.sm_5, Rez.Drawables.sm_6, Rez.Drawables.sm_7,
+             Rez.Drawables.sm_8, Rez.Drawables.sm_9],
+            [Rez.Drawables.sm_0_light, Rez.Drawables.sm_1_light, Rez.Drawables.sm_2_light,
+             Rez.Drawables.sm_3_light, Rez.Drawables.sm_4_light, Rez.Drawables.sm_5_light,
+             Rez.Drawables.sm_6_light, Rez.Drawables.sm_7_light, Rez.Drawables.sm_8_light,
+             Rez.Drawables.sm_9_light],
+            0);
+
+        md = new GlyphSet(
+            [Rez.Drawables.md_0, Rez.Drawables.md_1, Rez.Drawables.md_2, Rez.Drawables.md_3,
+             Rez.Drawables.md_4, Rez.Drawables.md_5, Rez.Drawables.md_6, Rez.Drawables.md_7,
+             Rez.Drawables.md_8, Rez.Drawables.md_9,
+             Rez.Drawables.md_minus, Rez.Drawables.md_degree, Rez.Drawables.md_meem],
+            [Rez.Drawables.md_0_light, Rez.Drawables.md_1_light, Rez.Drawables.md_2_light,
+             Rez.Drawables.md_3_light, Rez.Drawables.md_4_light, Rez.Drawables.md_5_light,
+             Rez.Drawables.md_6_light, Rez.Drawables.md_7_light, Rez.Drawables.md_8_light,
+             Rez.Drawables.md_9_light,
+             Rez.Drawables.md_minus_light, Rez.Drawables.md_degree_light,
+             Rez.Drawables.md_meem_light],
+            1);
+
+        xs = new GlyphSet(
+            [Rez.Drawables.xs_0, Rez.Drawables.xs_1, Rez.Drawables.xs_2, Rez.Drawables.xs_3,
+             Rez.Drawables.xs_4, Rez.Drawables.xs_5, Rez.Drawables.xs_6, Rez.Drawables.xs_7,
+             Rez.Drawables.xs_8, Rez.Drawables.xs_9],
+            [Rez.Drawables.xs_0_light, Rez.Drawables.xs_1_light, Rez.Drawables.xs_2_light,
+             Rez.Drawables.xs_3_light, Rez.Drawables.xs_4_light, Rez.Drawables.xs_5_light,
+             Rez.Drawables.xs_6_light, Rez.Drawables.xs_7_light, Rez.Drawables.xs_8_light,
+             Rez.Drawables.xs_9_light],
+            0);
     }
 
-    function drawTemp(dc, celsius as Number or Null, cx, yMid) as Void {
-        var numStr = "--";
-        if (celsius != null) {
-            numStr = (celsius as Number).format("%d");
+    function ensureAll(mode as Number) as Void {
+        if (clock == null) {
+            build();
         }
-        var w = measureAscii(numStr) + GAP + degree.getWidth() + GAP + meem.getWidth();
-        var x = cx - w / 2;
-        x = drawAsciiLeft(dc, numStr, x, yMid - glyphHeight() / 2);
-        x += GAP;
-        x = blit(dc, degree, x, yMid);
-        blit(dc, meem, x, yMid);
+        clock.ensure(mode);
+        sm.ensure(mode);
+        md.ensure(mode);
+        xs.ensure(mode);
+    }
+
+    // Stacked 24 h time. Both rows share one tabular width, so they align exactly.
+    function drawStacked24h(dc, hourStr as String, minStr as String,
+                            cx as Number, cyCenter as Number, stackGap as Number) as Void {
+        var rowH   = clock.cellHeight();
+        var hourY  = cyCenter - (rowH * 2 + stackGap) / 2;
+        clock.drawCentered(dc, hourStr, cx, hourY + rowH / 2);
+        clock.drawCentered(dc, minStr,  cx, hourY + rowH + stackGap + rowH / 2);
     }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Arabic month and weekday bitmaps (current values only)
-
 // ─────────────────────────────────────────────────────────────────────────────
 
 module ArabicLabels {
@@ -460,7 +354,6 @@ module ArabicLabels {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Hijri calendar helpers
-
 // ─────────────────────────────────────────────────────────────────────────────
 
 module HijriHelpers {
@@ -504,7 +397,6 @@ module HijriHelpers {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Time formatting helpers
-
 // ─────────────────────────────────────────────────────────────────────────────
 
 module TimeHelpers {
@@ -519,7 +411,6 @@ module TimeHelpers {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Settings menus – root, Hijri offset, color theme
-
 // ─────────────────────────────────────────────────────────────────────────────
 
 class WatchfaceSettingsMenu extends WatchUi.Menu2 {
@@ -611,7 +502,6 @@ class HijriOffsetMenuDelegate extends WatchUi.Menu2InputDelegate {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // App entry point
-
 // ─────────────────────────────────────────────────────────────────────────────
 
 class MyProjectApp extends Application.AppBase {
@@ -635,7 +525,6 @@ class MyProjectApp extends Application.AppBase {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Watch-face view
-
 // ─────────────────────────────────────────────────────────────────────────────
 
 class MyWatchFace extends WatchUi.WatchFace {
@@ -651,37 +540,63 @@ class MyWatchFace extends WatchUi.WatchFace {
     var cachedSteps = 0;
     var cachedBodyBattery = null;
     var cachedGregorianInfo = null;
-    var loadedAssetColorMode = -1;
-    // Porthole layout
-    const PORTHOLE_CX = 144;
-    const Y_PORTHOLE_HR = 20;
-    const Y_PORTHOLE_STEPS = 44;
-    const Y_PORTHOLE_BOTTOM = 70;
-    // Vertical layout constants (pixels from top of 176 px display)
-    const CY_TIME         = 64;
+    var cachedHijri = null;
+
+    // Porthole — resolved from WatchUi.getSubscreen(); literals are the fallback
+    // for the 45 mm / 50 mm panel (62×62 box at x=113, y=0 → centre 143.5, 31.5).
+    const PORTHOLE_CX_FALLBACK = 144;
+    const PORTHOLE_CY_FALLBACK = 31;
+    var portholeCx = PORTHOLE_CX_FALLBACK;
+    var portholeCy = PORTHOLE_CY_FALLBACK;
+    // Rows sit ±8 px from the porthole centre. With the xs (h=11) and md (h=13)
+    // tiers that puts the two-row block at y 17.5–45.5, centred on 31.5, and keeps
+    // both rows inside a 55.3 px chord.
+    const PORTHOLE_HR_DY    = -8;
+    const PORTHOLE_STEPS_DY = 8;
+
+    // Vertical layout (px from the top of the 176 px display). Spacing is budgeted
+    // against the *tallest* bitmap in each set, so no month/weekday combination can
+    // collide: clock 20–98, weekday 102–124, Hijri 127–147, Gregorian 150–166.
+    const CY_TIME         = 59;
     const TIME_STACK_GAP  = 4;
     const TIME_CX_OFFSET  = -26;
     const Y_TEMP          = 92;
-    const Y_WEEKDAY       = 116;
-    const Y_HIJRI         = 138;
-    const Y_GREGORIAN     = 156;
+    const Y_WEEKDAY       = 113;
+    const Y_HIJRI         = 137;
+    const Y_GREGORIAN     = 158;
     const DATE_MONTH_GAP  = 6;
-    const Y_BATTERY_BAR = 172;
+    // Both date rows share this right edge. Capped because the Gregorian row's own
+    // bottom (y=166) only spans x 29–146 — a wider seam would clip the day digits.
+    const DATE_SEAM_MAX   = 144;
+
+    // Bars are inset to the panel's visible span so 0-100 % maps onto real pixels,
+    // and kept 2-3 px clear of the chamfer so a small difference between the SDK
+    // bezel mask and the physical panel cannot clip them. Each is a 1 px outline
+    // (the track) with a proportional fill inside - see the note in Theme.
+    const X_BATTERY_BAR = 42;
+    const W_BATTERY_BAR = 92;
+    const Y_BATTERY_BAR = 170;
     const H_BATTERY_BAR = 4;
-    const X_BODY_BATTERY_BAR = 4;
+    const X_BODY_BATTERY_BAR = 6;
     const W_BODY_BATTERY_BAR = 4;
+    const Y_BODY_BATTERY_TOP = 38;
+    const H_BODY_BATTERY_BAR = 100;
     const MIN_BB_FILL_PX = 5;
-    const DEBUG_BODY_BATTERY = -1; // hardcoded % for layout debug; set to -1 for live data
+    const DEBUG_BODY_BATTERY = -1; // hardcoded % for layout debug; -1 for live data
 
     function initialize() {
         WatchFace.initialize();
         timer = new Timer.Timer();
+        resolveSubscreen();
     }
 
-    function ensureThemeAssets(mode as Number) as Void {
-        ClockDigits.ensure(mode);
-        SmallDigits.ensure(mode);
-        loadedAssetColorMode = mode;
+    // The porthole is a real hardware region; ask for it rather than assuming.
+    function resolveSubscreen() as Void {
+        if (!(WatchUi has :getSubscreen)) { return; }
+        var s = WatchUi.getSubscreen();
+        if (s == null) { return; }
+        portholeCx = s.x + s.width / 2;
+        portholeCy = s.y + s.height / 2;
     }
 
     function onShow() {
@@ -708,11 +623,13 @@ class MyWatchFace extends WatchUi.WatchFace {
 
     // ─────────────────────────────────────────────────────────────────────────
     // Per-minute update – refresh all cached data, then request a redraw
-
     // ─────────────────────────────────────────────────────────────────────────
 
     function onMinuteUiTick() as Void {
-        cachedGregorianInfo = Gregorian.info(Time.now(), Time.FORMAT_SHORT);
+        var g = Gregorian.info(Time.now(), Time.FORMAT_SHORT);
+        cachedGregorianInfo = g;
+        // Converted once here rather than per draw call.
+        cachedHijri = HijriHelpers.gregorianToHijri(g.year, g.month, g.day, getHijriDayOffset());
         if (Toybox has :Weather) {
             var now = Time.now().value();
             if (cachedConditions == null ||
@@ -732,63 +649,73 @@ class MyWatchFace extends WatchUi.WatchFace {
 
     // ─────────────────────────────────────────────────────────────────────────
     // Main draw (once per minute via onMinuteUiTick)
-
     // ─────────────────────────────────────────────────────────────────────────
 
     function onUpdate(dc) {
         var mode = Theme.getColorMode();
-        ensureThemeAssets(mode);
+        Glyphs.ensureAll(mode);
+
+        var g = cachedGregorianInfo;
+        if (g == null) {
+            g = Gregorian.info(Time.now(), Time.FORMAT_SHORT);
+            cachedGregorianInfo = g;
+        }
+        var hijri = cachedHijri;
+        if (hijri == null) {
+            hijri = HijriHelpers.gregorianToHijri(g.year, g.month, g.day, getHijriDayOffset());
+            cachedHijri = hijri;
+        }
+        // One ensure per draw, shared by the weekday and both date rows.
+        var hijriMonth = (hijri as Dictionary)[:month] as Number;
+        ArabicLabels.ensure(hijriMonth.toNumber(), g.month, g.day_of_week, mode);
+
         var bg = Theme.backgroundForMode(mode);
         var fg = Theme.foregroundForMode(mode);
-        var accent = Theme.accentForMode(mode);
         dc.setColor(bg, bg);
         dc.clear();
         dc.setColor(fg, Graphics.COLOR_TRANSPARENT);
         drawTime(dc);
         drawTemperature(dc);
         drawPortholeContents(dc);
-        drawWeekday(dc, mode);
-        drawCenterDates(dc, mode);
-        drawBodyBatteryBar(dc, fg, accent);
-        drawBatteryBar(dc, fg, accent);
+        drawWeekday(dc);
+        drawCenterDates(dc, g, hijri);
+        drawBodyBatteryBar(dc, fg);
+        drawBatteryBar(dc, fg);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
     // ① Time
-
     // ─────────────────────────────────────────────────────────────────────────
 
     function drawTime(dc) {
         var parts   = TimeHelpers.getHourMinute24(System.getClockTime());
-        var hourStr = parts[:hour] as String;
-        var minStr  = parts[:min] as String;
         var cx      = dc.getWidth() / 2 + TIME_CX_OFFSET;
-        ClockDigits.drawStacked24h(dc, hourStr, minStr, cx, CY_TIME, TIME_STACK_GAP);
+        Glyphs.drawStacked24h(dc, parts[:hour] as String, parts[:min] as String,
+                              cx, CY_TIME, TIME_STACK_GAP);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // ② Temperature under porthole
-
+    // ② Temperature under the porthole
+    //
+    // RTL expression, LTR number. The unit is logically [°][م]; in a right-to-left
+    // run those reverse, so the unit paints as م° at the left and the number sits
+    // to its right, reading left-to-right as usual: م°٢٧
+    //
+    // The sign travels with the number rather than the expression, so a negative
+    // reads م°-٤٠ - the whole "-40" stays one left-to-right block.
     // ─────────────────────────────────────────────────────────────────────────
 
     function drawTemperature(dc) {
-        var celsius = null;
+        var numStr = "--";
         if (Toybox has :Weather && cachedConditions != null && cachedConditions.temperature != null) {
-            celsius = cachedConditions.temperature.toFloat().toNumber();
+            // Round rather than truncate: -0.6 °C should read -1, not 0.
+            var c = Math.round(cachedConditions.temperature.toFloat()).toNumber();
+            numStr = c.format("%d");
         }
-        SmallDigits.drawTemp(dc, celsius, PORTHOLE_CX, Y_TEMP);
+        Glyphs.md.drawCentered(dc, "m*" + numStr, portholeCx, Y_TEMP);
     }
 
-    function drawWeekday(dc, mode as Number) {
-        var g = cachedGregorianInfo;
-        if (g == null) { g = Gregorian.info(Time.now(), Time.FORMAT_SHORT); }
-        var hijri = HijriHelpers.gregorianToHijri(g.year, g.month, g.day, getHijriDayOffset());
-        ArabicLabels.ensure(
-            hijri[:month].toNumber(),
-            g.month,
-            g.day_of_week,
-            mode
-        );
+    function drawWeekday(dc) {
         var bmp = ArabicLabels.dowBmp;
         if (bmp == null) { return; }
         dc.drawBitmap(
@@ -799,57 +726,71 @@ class MyWatchFace extends WatchUi.WatchFace {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // ③ Porthole contents — position is the legend (HR top, steps below)
-
+    // ③ Porthole — position is the legend (HR above, steps below)
     // ─────────────────────────────────────────────────────────────────────────
 
     function drawPortholeContents(dc) {
-        SmallDigits.drawAsciiCentered(dc, cachedHrDisplay, PORTHOLE_CX, Y_PORTHOLE_HR);
-        SmallDigits.drawAsciiCentered(dc, cachedSteps.toString(), PORTHOLE_CX, Y_PORTHOLE_STEPS);
+        Glyphs.xs.drawCentered(dc, cachedHrDisplay, portholeCx, portholeCy + PORTHOLE_HR_DY);
+        var steps = cachedSteps.toString();
+        stepsGlyphSet(steps).drawCentered(dc, steps, portholeCx, portholeCy + PORTHOLE_STEPS_DY);
     }
 
-    function drawDateRow(dc, monthBmp as BitmapResource, dayStr as String, cx, yMid) as Void {
-        var dayW = SmallDigits.measureAscii(dayStr);
-        var dayH = SmallDigits.glyphHeight();
-        var mw = monthBmp.getWidth();
-        var mh = monthBmp.getHeight();
-        var total = mw + DATE_MONTH_GAP + dayW;
-        var x = cx - total / 2;
-        dc.drawBitmap(x, yMid - mh / 2, monthBmp);
-        SmallDigits.drawAsciiLeft(dc, dayStr, x + mw + DATE_MONTH_GAP, yMid - dayH / 2);
+    // Steps are always exact. Five digits do not fit the md tier, so past 9999 the
+    // row drops to xs: 5 cells = 45 px inside a 56.7 px chord.
+    //
+    // This replaced an earlier plan to abbreviate 10 000+ as thousands-plus-decimal
+    // (12.3). Rendered at 13 px the Arabic decimal separator is an 8-pixel mark and
+    // Arabic-Indic zero is an 11-pixel mark at the same height - so 12.3 read as
+    // 1203, a 10x misread. Dropping a tier keeps the count exact and unambiguous.
+    function stepsGlyphSet(text as String) {
+        return (text.length() > 4) ? Glyphs.xs : Glyphs.md;
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // ④ Center column below time
-
+    // ④ Date rows — shared right seam, block centred
+    //
+    // In RTL display order a row reads [month][gap][day], so the day's right edge
+    // is the natural reading anchor. Both rows are aligned to one seam, and the
+    // wider row is what centres the block.
     // ─────────────────────────────────────────────────────────────────────────
 
-    function drawCenterDates(dc, mode as Number) {
+    function drawCenterDates(dc, g, hijri) {
         var cx = dc.getWidth() / 2;
-        var g = cachedGregorianInfo;
-        if (g == null) { g = Gregorian.info(Time.now(), Time.FORMAT_SHORT); }
-        var hijri = HijriHelpers.gregorianToHijri(g.year, g.month, g.day, getHijriDayOffset());
-        ArabicLabels.ensure(
-            hijri[:month].toNumber(),
-            g.month,
-            g.day_of_week,
-            mode
-        );
-        if (ArabicLabels.hijriBmp != null) {
-            drawDateRow(dc, ArabicLabels.hijriBmp, hijri[:day].toNumber().format("%02d"), cx, Y_HIJRI);
+        var hijriBmp = ArabicLabels.hijriBmp;
+        var gregBmp  = ArabicLabels.gregBmp;
+
+        var hijriDay = ((hijri as Dictionary)[:day] as Number).toNumber().format("%02d");
+        var gregDay  = g.day.format("%02d");
+
+        var hijriW = (hijriBmp == null) ? 0
+                   : hijriBmp.getWidth() + DATE_MONTH_GAP + Glyphs.sm.measure(hijriDay);
+        var gregW  = (gregBmp == null) ? 0
+                   : gregBmp.getWidth() + DATE_MONTH_GAP + Glyphs.xs.measure(gregDay);
+
+        var blockW = (hijriW > gregW) ? hijriW : gregW;
+        var seam = cx + blockW / 2;
+        if (seam > DATE_SEAM_MAX) { seam = DATE_SEAM_MAX; }
+
+        if (hijriBmp != null) {
+            drawDateRow(dc, hijriBmp, hijriDay, Glyphs.sm, seam, Y_HIJRI);
         }
-        if (ArabicLabels.gregBmp != null) {
-            drawDateRow(dc, ArabicLabels.gregBmp, g.day.format("%02d"), cx, Y_GREGORIAN);
+        if (gregBmp != null) {
+            drawDateRow(dc, gregBmp, gregDay, Glyphs.xs, seam, Y_GREGORIAN);
         }
+    }
+
+    function drawDateRow(dc, monthBmp, dayStr as String, set, xRight as Number, yMid as Number) as Void {
+        set.drawRight(dc, dayStr, xRight, yMid);
+        var dayW = set.measure(dayStr);
+        var mw = monthBmp.getWidth();
+        dc.drawBitmap(xRight - dayW - DATE_MONTH_GAP - mw, yMid - monthBmp.getHeight() / 2, monthBmp);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
     // ⑤ Body battery bar (left edge)
-
     // ─────────────────────────────────────────────────────────────────────────
 
-    function drawBodyBatteryBar(dc, fg as Number, accent as Number) {
-        var barH = Y_BATTERY_BAR;
+    function drawBodyBatteryBar(dc, fg as Number) {
         var bbValue = null;
         if (DEBUG_BODY_BATTERY >= 0) {
             bbValue = DEBUG_BODY_BATTERY;
@@ -857,44 +798,43 @@ class MyWatchFace extends WatchUi.WatchFace {
             bbValue = cachedBodyBattery;
         }
         dc.setPenWidth(1);
-        dc.setColor(accent, Graphics.COLOR_TRANSPARENT);
-        dc.drawRectangle(X_BODY_BATTERY_BAR, 0, W_BODY_BATTERY_BAR, barH);
-        if (bbValue != null && bbValue > 0) {
-            var fillH = (barH.toFloat() * bbValue.toFloat() / 100.0).toNumber();
-            if (fillH < MIN_BB_FILL_PX) {
-                fillH = MIN_BB_FILL_PX;
-            }
-            if (fillH > barH) {
-                fillH = barH;
-            }
-            dc.setColor(fg, Graphics.COLOR_TRANSPARENT);
-            dc.fillRectangle(X_BODY_BATTERY_BAR, barH - fillH, W_BODY_BATTERY_BAR, fillH);
-        }
+        dc.setColor(fg, Graphics.COLOR_TRANSPARENT);
+        dc.drawRectangle(X_BODY_BATTERY_BAR, Y_BODY_BATTERY_TOP,
+                         W_BODY_BATTERY_BAR, H_BODY_BATTERY_BAR);
+        if (bbValue == null || bbValue <= 0) { return; }
+        // Fill the 2 px channel inside the outline, growing upward from the base.
+        var innerH = H_BODY_BATTERY_BAR - 2;
+        var fillH = (innerH.toFloat() * bbValue.toFloat() / 100.0).toNumber();
+        if (fillH < MIN_BB_FILL_PX) { fillH = MIN_BB_FILL_PX; }
+        if (fillH > innerH) { fillH = innerH; }
+        dc.fillRectangle(X_BODY_BATTERY_BAR + 1,
+                         Y_BODY_BATTERY_TOP + H_BODY_BATTERY_BAR - 1 - fillH,
+                         W_BODY_BATTERY_BAR - 2, fillH);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
     // ⑥ Battery bar
-
     // ─────────────────────────────────────────────────────────────────────────
 
-    function drawBatteryBar(dc, fg as Number, accent as Number) {
-        var w = dc.getWidth();
+    function drawBatteryBar(dc, fg as Number) {
         var pct = 0.0;
         if (cachedSystemStats != null) {
             pct = cachedSystemStats.battery.toFloat() / 100.0;
         }
-        var fillW = (w.toFloat() * pct).toNumber();
-        dc.setColor(accent, Graphics.COLOR_TRANSPARENT);
-        dc.fillRectangle(0, Y_BATTERY_BAR, w, H_BATTERY_BAR);
+        dc.setPenWidth(1);
+        dc.setColor(fg, Graphics.COLOR_TRANSPARENT);
+        dc.drawRectangle(X_BATTERY_BAR, Y_BATTERY_BAR, W_BATTERY_BAR, H_BATTERY_BAR);
+        // Fill the 2 px channel inside the outline, growing from the left.
+        var innerW = W_BATTERY_BAR - 2;
+        var fillW = (innerW.toFloat() * pct).toNumber();
         if (fillW > 0) {
-            dc.setColor(fg, Graphics.COLOR_TRANSPARENT);
-            dc.fillRectangle(0, Y_BATTERY_BAR, fillW, H_BATTERY_BAR);
+            dc.fillRectangle(X_BATTERY_BAR + 1, Y_BATTERY_BAR + 1,
+                             fillW, H_BATTERY_BAR - 2);
         }
     }
 
     // ─────────────────────────────────────────────────────────────────────────
     // Data helpers
-
     // ─────────────────────────────────────────────────────────────────────────
 
     function getHijriDayOffset() as Number {
