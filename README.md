@@ -1,6 +1,6 @@
 # My Watch Face for Garmin Instinct 3 Solar 45mm
 
-An Arabic-only Connect IQ watch face for the **Garmin Instinct 3 Solar 45mm**: stacked Noto Kufi Arabic-Indic time, dual calendar (Hijri + Gregorian) without years, weekday, temperature in °م, and an activity porthole.
+An Arabic-only Connect IQ watch face for the **Garmin Instinct 3 Solar 45mm**: stacked Noto Kufi Arabic-Indic time, dual calendar (Hijri + Gregorian) without years, weekday, temperature in م°, and an activity porthole.
 
 > **Note:** Source is intentionally monolithic in a single `MyWatchFace.mc` file for easy sharing and review.
 
@@ -8,25 +8,35 @@ An Arabic-only Connect IQ watch face for the **Garmin Instinct 3 Solar 45mm**: s
 
 ```
 ┌─────────────────────────────────────┐
-│                         ╭─  ٨٠  ─╮ │
-│   ١٤                    │  ١٢٣٤  │ │
-│   ٣٥                    ٢٣°م     │
-│                                     │
-│            الخميس                   │
-│         جمادى الآخرة  ١٥            │
-│            أغسطس  ٢٧                │
-│▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░░░░░░░░░░░░░░░░░░░░│ battery
+│                         ╭─  ٩٠  ─╮ │
+│ ▌ ١٩                    │ ٧٤٣٦  │ │
+│ ▌ ١٨                    م°٢٧     │
+│ ▌                                   │
+│ ▌          الخميس                   │
+│ ▌       ربيع الأول  ١٤              │
+│ ▌          أغسطس  ٢٧                │
+│         ▓▓▓▓▓▓░░░░░░░               │ battery
 └─────────────────────────────────────┘
+   └ body battery
 ```
 
-Porthole legend is position (HR top, steps below). Date rows are month + day, day on the right.
+Porthole legend is position (HR top, steps below). Date rows are month + day, day
+on the right, with both rows sharing one right seam.
+
+The display is a 176×176 **semi-octagon**, not a circle — the corners are rounded
+chamfers, so the usable span narrows sharply top and bottom. Both bars are inset to
+the panel's actually-visible span rather than drawn edge to edge; drawn full width
+they would be invisible below ~20 % and saturated above ~78 %.
 
 ## Features
 
 ### Time
 
 - **Stacked 24 h** — `HH` over `MM` (no colon)
-- **Noto Kufi Arabic-Indic digits** — proportional ٠–٩ sprites, dark + light
+- **Noto Kufi Arabic-Indic digits** — *tabular* ٠–٩ sprites, dark + light
+- Both rows share one 62 px width, so the hour and minute always align. With
+  proportional sprites (٠–٩ ran 9–30 px) the two independently-centred rows sat up
+  to 21 px apart at times like 11:33.
 - Positioned upper-left toward center (clears the porthole)
 
 ### Weekday
@@ -37,25 +47,32 @@ Porthole legend is position (HR top, steps below). Date rows are month + day, da
 ### Dates
 
 - **Hijri** — full month name + day (no year)
-- **Gregorian** — `يناير`…`ديسمبر` + day (no year)
+- **Gregorian** — `يناير`…`ديسمبر` + day (no year), rendered ~12 % smaller than
+  Hijri so the two calendars read as a hierarchy
 - **Hijri offset** — configurable ±2 days (Settings → Hijri date shift)
 - **Color theme** — dark (default) or light
 
 ### Temperature
 
-- Arabic-Indic digits + `°م` under the porthole
-- Missing data draws `--°م`
+- Unit then number: the logical `°م` reverses in an RTL run, so it paints as `م°`
+  at the left with the number to its right — `م°٢٧`. Centred on the porthole axis.
+- Rounded, not truncated: −0.6 °C reads `-1`
+- A negative keeps its sign with the number as one LTR block: `م°-٤٠`
+- Missing data draws `م°--`
 - Weather condition icons are not shown
 
 ### Activity porthole (upper-right)
 
-- **Heart rate** (top) and **steps** (below), numbers only
+- **Heart rate** (top, `xs` tier) and **steps** (below, `md` tier), numbers only
+- Steps stay exact at every value: past 9999 the row drops to the `xs` tier so five
+  digits still clear the circle
 - Missing HR draws `--`
+- Geometry comes from `WatchUi.getSubscreen()`, not a hardcoded centre
 
 ### Battery bar
 
-- 4 px bar at the bottom, proportional fill
-- Body Battery bar on the left edge
+- 4 px bar at the bottom, proportional fill across the visible span (x 40–135)
+- Body Battery bar on the left edge, spanning its visible run (y 36–139)
 
 ## Power efficiency
 
@@ -74,11 +91,23 @@ All UI updates run on a **single 60-second timer**.
 | Module | Purpose |
 |--------|---------|
 | `Theme` | `colorMode` property, palette, dark/light resource selection |
-| `ClockDigits` | Large proportional Arabic-Indic time digits |
-| `SmallDigits` | Small digits, minus, degree, `م` for dates / porthole / temp |
+| `GlyphSet` | One tabular sprite tier: uniform digit cells, optional symbols |
+| `Glyphs` | The four tiers, plus the stacked-time helper |
 | `ArabicLabels` | Current Hijri month, Gregorian month, and weekday bitmaps |
 | `HijriHelpers` | Tabular Hijri conversion |
 | `TimeHelpers` | Hour/minute formatting for stacked time |
+
+### Sprite tiers
+
+Cell sizes are **derived** by the generator from the widest ink it actually renders,
+never hardcoded, so changing the font or a target height stays correct.
+
+| Tier | Cell | Used by |
+|------|------|---------|
+| `digit_` | 30×37 | Stacked clock |
+| `sm_` | 14×17 | Hijri day |
+| `md_` | 11×13 | Steps (≤ 9999), temperature (+ `-`, `°`, `م`) |
+| `xs_` | 9×11 | Heart rate, Gregorian day, steps (≥ 10000) |
 
 Sprites regenerate via [`scripts/generate-arabic-assets.ps1`](scripts/generate-arabic-assets.ps1) from [Noto Kufi Arabic Bold](https://fonts.google.com/noto/specimen/Noto+Kufi+Arabic) (OFL).
 

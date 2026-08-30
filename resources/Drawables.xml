@@ -1,6 +1,7 @@
 <resources>
    <bitmap id="launcher" filename="images/launcher.png" />
 
+   <!-- Clock digits - tabular, cell 30x37 -->
    <bitmap id="digit_0" filename="images/digit_0.png" />
    <bitmap id="digit_1" filename="images/digit_1.png" />
    <bitmap id="digit_2" filename="images/digit_2.png" />
@@ -22,6 +23,7 @@
    <bitmap id="digit_8_light" filename="images/digit_8_light.png" />
    <bitmap id="digit_9_light" filename="images/digit_9_light.png" />
 
+   <!-- Hijri day - tabular, cell 14x17 -->
    <bitmap id="sm_0" filename="images/sm_0.png" />
    <bitmap id="sm_1" filename="images/sm_1.png" />
    <bitmap id="sm_2" filename="images/sm_2.png" />
@@ -32,9 +34,6 @@
    <bitmap id="sm_7" filename="images/sm_7.png" />
    <bitmap id="sm_8" filename="images/sm_8.png" />
    <bitmap id="sm_9" filename="images/sm_9.png" />
-   <bitmap id="sm_minus" filename="images/sm_minus.png" />
-   <bitmap id="sm_degree" filename="images/sm_degree.png" />
-   <bitmap id="sm_meem" filename="images/sm_meem.png" />
    <bitmap id="sm_0_light" filename="images/sm_0_light.png" />
    <bitmap id="sm_1_light" filename="images/sm_1_light.png" />
    <bitmap id="sm_2_light" filename="images/sm_2_light.png" />
@@ -45,10 +44,58 @@
    <bitmap id="sm_7_light" filename="images/sm_7_light.png" />
    <bitmap id="sm_8_light" filename="images/sm_8_light.png" />
    <bitmap id="sm_9_light" filename="images/sm_9_light.png" />
-   <bitmap id="sm_minus_light" filename="images/sm_minus_light.png" />
-   <bitmap id="sm_degree_light" filename="images/sm_degree_light.png" />
-   <bitmap id="sm_meem_light" filename="images/sm_meem_light.png" />
 
+   <!-- Steps + temperature - tabular, cell 11x13 -->
+   <bitmap id="md_0" filename="images/md_0.png" />
+   <bitmap id="md_1" filename="images/md_1.png" />
+   <bitmap id="md_2" filename="images/md_2.png" />
+   <bitmap id="md_3" filename="images/md_3.png" />
+   <bitmap id="md_4" filename="images/md_4.png" />
+   <bitmap id="md_5" filename="images/md_5.png" />
+   <bitmap id="md_6" filename="images/md_6.png" />
+   <bitmap id="md_7" filename="images/md_7.png" />
+   <bitmap id="md_8" filename="images/md_8.png" />
+   <bitmap id="md_9" filename="images/md_9.png" />
+   <bitmap id="md_minus" filename="images/md_minus.png" />
+   <bitmap id="md_degree" filename="images/md_degree.png" />
+   <bitmap id="md_meem" filename="images/md_meem.png" />
+   <bitmap id="md_0_light" filename="images/md_0_light.png" />
+   <bitmap id="md_1_light" filename="images/md_1_light.png" />
+   <bitmap id="md_2_light" filename="images/md_2_light.png" />
+   <bitmap id="md_3_light" filename="images/md_3_light.png" />
+   <bitmap id="md_4_light" filename="images/md_4_light.png" />
+   <bitmap id="md_5_light" filename="images/md_5_light.png" />
+   <bitmap id="md_6_light" filename="images/md_6_light.png" />
+   <bitmap id="md_7_light" filename="images/md_7_light.png" />
+   <bitmap id="md_8_light" filename="images/md_8_light.png" />
+   <bitmap id="md_9_light" filename="images/md_9_light.png" />
+   <bitmap id="md_minus_light" filename="images/md_minus_light.png" />
+   <bitmap id="md_degree_light" filename="images/md_degree_light.png" />
+   <bitmap id="md_meem_light" filename="images/md_meem_light.png" />
+
+   <!-- Heart rate + Gregorian day - tabular, cell 9x11 -->
+   <bitmap id="xs_0" filename="images/xs_0.png" />
+   <bitmap id="xs_1" filename="images/xs_1.png" />
+   <bitmap id="xs_2" filename="images/xs_2.png" />
+   <bitmap id="xs_3" filename="images/xs_3.png" />
+   <bitmap id="xs_4" filename="images/xs_4.png" />
+   <bitmap id="xs_5" filename="images/xs_5.png" />
+   <bitmap id="xs_6" filename="images/xs_6.png" />
+   <bitmap id="xs_7" filename="images/xs_7.png" />
+   <bitmap id="xs_8" filename="images/xs_8.png" />
+   <bitmap id="xs_9" filename="images/xs_9.png" />
+   <bitmap id="xs_0_light" filename="images/xs_0_light.png" />
+   <bitmap id="xs_1_light" filename="images/xs_1_light.png" />
+   <bitmap id="xs_2_light" filename="images/xs_2_light.png" />
+   <bitmap id="xs_3_light" filename="images/xs_3_light.png" />
+   <bitmap id="xs_4_light" filename="images/xs_4_light.png" />
+   <bitmap id="xs_5_light" filename="images/xs_5_light.png" />
+   <bitmap id="xs_6_light" filename="images/xs_6_light.png" />
+   <bitmap id="xs_7_light" filename="images/xs_7_light.png" />
+   <bitmap id="xs_8_light" filename="images/xs_8_light.png" />
+   <bitmap id="xs_9_light" filename="images/xs_9_light.png" />
+
+   <!-- Hijri months -->
    <bitmap id="hijri_1" filename="images/hijri_1.png" />
    <bitmap id="hijri_2" filename="images/hijri_2.png" />
    <bitmap id="hijri_3" filename="images/hijri_3.png" />
@@ -74,6 +121,7 @@
    <bitmap id="hijri_11_light" filename="images/hijri_11_light.png" />
    <bitmap id="hijri_12_light" filename="images/hijri_12_light.png" />
 
+   <!-- Gregorian months -->
    <bitmap id="greg_1" filename="images/greg_1.png" />
    <bitmap id="greg_2" filename="images/greg_2.png" />
    <bitmap id="greg_3" filename="images/greg_3.png" />
@@ -99,6 +147,7 @@
    <bitmap id="greg_11_light" filename="images/greg_11_light.png" />
    <bitmap id="greg_12_light" filename="images/greg_12_light.png" />
 
+   <!-- Weekdays -->
    <bitmap id="dow_1" filename="images/dow_1.png" />
    <bitmap id="dow_2" filename="images/dow_2.png" />
    <bitmap id="dow_3" filename="images/dow_3.png" />
@@ -113,4 +162,5 @@
    <bitmap id="dow_5_light" filename="images/dow_5_light.png" />
    <bitmap id="dow_6_light" filename="images/dow_6_light.png" />
    <bitmap id="dow_7_light" filename="images/dow_7_light.png" />
+
 </resources>

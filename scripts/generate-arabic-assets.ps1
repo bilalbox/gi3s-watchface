@@ -1,6 +1,13 @@
 # Renders Noto Kufi Arabic Bold to 1-bit PNG sprites for Connect IQ MIP.
-# Large proportional ٠–٩ (digit_*), small ٠–٩ plus minus/meem/degree (sm_*),
-# Hijri/Gregorian months and weekdays. Dark (white ink) and light (black ink).
+#
+# Four TABULAR digit tiers - every glyph in a tier shares one cell width, so a
+# multi-digit string never changes width as its value changes:
+#   digit_ 30x37  clock      sm_ 14x17  Hijri day
+#   md_    11x13  steps,     xs_  9x11  heart rate, Gregorian day, 5-digit steps
+#                 temperature (md_ also carries minus / degree / meem)
+# Plus Hijri and Gregorian month names and weekdays. Gregorian renders ~12%%
+# smaller than Hijri. Cell sizes are derived from the widest ink actually
+# rendered, never hardcoded. Dark (white ink) and light (black ink).
 Add-Type -AssemblyName System.Drawing
 
 $ErrorActionPreference = "Stop"
@@ -87,6 +94,37 @@ function Crop-ToInk($bmp, [int]$padX, [int]$padY, [int]$targetH, $ink) {
     return $dst
 }
 
+# Pads ink into a fixed cell, centred on both axes. This is what makes a digit set
+# tabular: every glyph occupies the same advance, so multi-digit strings never change
+# width as their value changes.
+function Fit-ToCell($bmp, [int]$cellW, [int]$cellH, $ink) {
+    Binarize-Bitmap $bmp $ink
+    $b = Get-InkBounds $bmp
+    $dst = New-Object System.Drawing.Bitmap $cellW, $cellH, ([System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
+    $g = [System.Drawing.Graphics]::FromImage($dst)
+    $g.Clear($clear)
+    $g.Dispose()
+    if ($null -ne $b) {
+        $srcW = $b.R - $b.L + 1
+        $srcH = $b.B - $b.T + 1
+        $offX = [int](($cellW - $srcW) / 2)
+        $offY = [int](($cellH - $srcH) / 2)
+        if ($offX -lt 0) { $offX = 0 }
+        if ($offY -lt 0) { $offY = 0 }
+        for ($y = 0; $y -lt $srcH; $y++) {
+            $dy = $offY + $y
+            if ($dy -lt 0 -or $dy -ge $cellH) { continue }
+            for ($x = 0; $x -lt $srcW; $x++) {
+                $dx = $offX + $x
+                if ($dx -lt 0 -or $dx -ge $cellW) { continue }
+                $dst.SetPixel($dx, $dy, $bmp.GetPixel($b.L + $x, $b.T + $y))
+            }
+        }
+    }
+    $bmp.Dispose()
+    return $dst
+}
+
 function Render-Text([string]$text, [float]$px, $ink, [bool]$rtl, [int]$canvasW, [int]$canvasH) {
     $font = New-Font $px
     $bmp = New-Object System.Drawing.Bitmap $canvasW, $canvasH, ([System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
@@ -123,10 +161,10 @@ function Find-SizeForHeight([string]$probe, [int]$wantH, [bool]$rtl, $ink, [int]
     return $best
 }
 
-function New-DegreeBitmap([int]$h, $ink) {
-    $ow = 5
-    $oh = 5
-    $bmp = New-Object System.Drawing.Bitmap 7, $h, ([System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
+function New-DegreeBitmap([int]$h, $ink, [int]$ring = 5) {
+    $ow = $ring
+    $oh = $ring
+    $bmp = New-Object System.Drawing.Bitmap ($ring + 2), $h, ([System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
     $g = [System.Drawing.Graphics]::FromImage($bmp)
     $g.Clear($clear)
     $g.Dispose()
@@ -190,6 +228,56 @@ $dow = @(
 )
 $meem  = (FromCp @(0x0645))
 $minus = "-"
+
+# Widest and tallest ink across 0-9 at a given font size. Measurement only - reads
+# alpha directly rather than binarizing, so the size search stays cheap.
+function Measure-DigitInk([float]$px, $ink, [int]$cw, [int]$ch) {
+    $maxW = 0
+    $maxH = 0
+    for ($d = 0; $d -le 9; $d++) {
+        $raw = Render-Text $AR[$d].ToString() $px $ink $false $cw $ch
+        $b = Get-InkBounds $raw
+        $raw.Dispose()
+        if ($null -eq $b) { continue }
+        $w = $b.R - $b.L + 1
+        $h = $b.B - $b.T + 1
+        if ($w -gt $maxW) { $maxW = $w }
+        if ($h -gt $maxH) { $maxH = $h }
+    }
+    return @{ W = $maxW; H = $maxH }
+}
+
+# Emits one tabular digit set at an exact target cell height. The font size is
+# searched for (largest size whose tallest digit still fits), then the cell width is
+# derived from the widest ink actually rendered - never hardcoded, so swapping the
+# font or changing a target height stays correct.
+function Emit-TabularDigits(
+    [string]$prefix, [int]$targetCellH, $ink, [string]$sfx,
+    [int]$cw, [int]$ch, [float]$lo, [float]$hi
+) {
+    $wantInk = $targetCellH - 2
+    $px = $lo
+    $m  = $null
+    for ($s = $hi; $s -ge $lo; $s -= 0.5) {
+        $probe = Measure-DigitInk $s $ink $cw $ch
+        if ($probe.H -gt 0 -and $probe.H -le $wantInk) { $px = $s; $m = $probe; break }
+    }
+    if ($null -eq $m) {
+        $px = $lo
+        $m  = Measure-DigitInk $px $ink $cw $ch
+    }
+    $cellW = $m.W + 2
+    $cellH = $targetCellH
+    Write-Host ("  {0}*  font {1}px  cell {2}x{3}  (widest ink {4}px, tallest {5}px)" -f `
+        $prefix, $px, $cellW, $cellH, $m.W, $m.H)
+    for ($d = 0; $d -le 9; $d++) {
+        $raw  = Render-Text $AR[$d].ToString() $px $ink $false $cw $ch
+        $cell = Fit-ToCell $raw $cellW $cellH $ink
+        Save-Bmp $cell ("{0}{1}{2}.png" -f $prefix, $d, $sfx)
+        $cell.Dispose()
+    }
+    return @{ Px = $px; CellW = $cellW; CellH = $cellH }
+}
 $longestMonth = $hijri[5]
 $longestDow   = $dow[3]
 $tallDigit    = $AR[8].ToString()
@@ -202,52 +290,25 @@ foreach ($variant in @(
     $sfx = $variant.Suffix
     Write-Host "=== variant '$sfx' ==="
 
-    $clockPx = Find-SizeForHeight $tallDigit 42 $false $ink 96 96 28 64
-    Write-Host "Clock font ${clockPx}px"
-    $clockRaws = @()
-    $maxClockH = 0
-    for ($d = 0; $d -le 9; $d++) {
-        $raw = Render-Text $AR[$d].ToString() $clockPx $ink $false 96 96
-        Binarize-Bitmap $raw $ink
-        $b = Get-InkBounds $raw
-        $h = if ($null -eq $b) { 0 } else { $b.B - $b.T + 1 }
-        if ($h -gt $maxClockH) { $maxClockH = $h }
-        $clockRaws += $raw
-    }
-    $clockH = $maxClockH + 2
-    for ($d = 0; $d -le 9; $d++) {
-        $cropped = Crop-ToInk $clockRaws[$d] 1 1 $clockH $ink
-        Save-Bmp $cropped ("digit_{0}{1}.png" -f $d, $sfx)
-        $cropped.Dispose()
-    }
+    # ── Tabular digit tiers ──────────────────────────────────────────────────
+    #   digit_ : stacked HH/MM clock          sm_ : Hijri day
+    #   md_    : porthole steps, temperature  xs_ : porthole HR, Gregorian day
+    # Clock and sm_ keep the cell heights they have today (37 / 17); md_ and xs_ are
+    # new, sized so the porthole's worst-case content clears the circle.
+    $clock = Emit-TabularDigits "digit_" 37 $ink $sfx 96 96 28 64
+    $sm    = Emit-TabularDigits "sm_"    17 $ink $sfx 48 40  9 24
+    $md    = Emit-TabularDigits "md_"    13 $ink $sfx 40 32  6 20
+    $xs    = Emit-TabularDigits "xs_"    11 $ink $sfx 32 28  5 18
 
-    $smallPx = Find-SizeForHeight $tallDigit 15 $false $ink 48 40 9 24
-    Write-Host "Small font ${smallPx}px"
-    $smallRaws = @()
-    $maxSmallH = 0
-    for ($d = 0; $d -le 9; $d++) {
-        $raw = Render-Text $AR[$d].ToString() $smallPx $ink $false 48 40
-        Binarize-Bitmap $raw $ink
-        $b = Get-InkBounds $raw
-        $h = if ($null -eq $b) { 0 } else { $b.B - $b.T + 1 }
-        if ($h -gt $maxSmallH) { $maxSmallH = $h }
-        $smallRaws += $raw
-    }
-    $smallH = $maxSmallH + 2
-    for ($d = 0; $d -le 9; $d++) {
-        $cropped = Crop-ToInk $smallRaws[$d] 1 1 $smallH $ink
-        Save-Bmp $cropped ("sm_{0}{1}.png" -f $d, $sfx)
-        $cropped.Dispose()
-    }
+    # md_ also carries the temperature sign and unit. These stay proportional -
+    # only digits need a uniform advance.
+    $mdH  = $md.CellH
+    $mdPx = $md.Px
+    Save-Bmp (Crop-ToInk (Render-Text $minus $mdPx $ink $false 40 32) 1 1 $mdH $ink) ("md_minus{0}.png" -f $sfx)
+    Save-Bmp (Crop-ToInk (Render-Text $meem  $mdPx $ink $true  40 32) 1 1 $mdH $ink) ("md_meem{0}.png"  -f $sfx)
 
-    $minusRaw = Render-Text $minus $smallPx $ink $false 48 40
-    Save-Bmp (Crop-ToInk $minusRaw 1 1 $smallH $ink) ("sm_minus{0}.png" -f $sfx)
-
-    $meemRaw = Render-Text $meem $smallPx $ink $true 48 40
-    Save-Bmp (Crop-ToInk $meemRaw 1 1 $smallH $ink) ("sm_meem{0}.png" -f $sfx)
-
-    $deg = New-DegreeBitmap $smallH $ink
-    Save-Bmp $deg ("sm_degree{0}.png" -f $sfx)
+    $deg = New-DegreeBitmap $mdH $ink 4
+    Save-Bmp $deg ("md_degree{0}.png" -f $sfx)
     $deg.Dispose()
 
     $monthPx = Find-SizeForHeight $longestMonth 16 $true $ink 240 56 10 24
@@ -263,8 +324,13 @@ foreach ($variant in @(
         Save-Bmp $cropped ("hijri_{0}{1}.png" -f ($i + 1), $sfx)
         $cropped.Dispose()
     }
+    # Gregorian is the secondary calendar: render it ~12% smaller than Hijri so the
+    # two rows read as a hierarchy, and so the stack regains the vertical room the
+    # increased leading needs.
+    $gregPx = [Math]::Max(8.0, [Math]::Round($monthPx * 0.88, 1))
+    Write-Host "Gregorian month font ${gregPx}px (Hijri ${monthPx}px)"
     for ($i = 0; $i -lt 12; $i++) {
-        $raw = Render-Text $greg[$i] $monthPx $ink $true 240 56
+        $raw = Render-Text $greg[$i] $gregPx $ink $true 240 56
         $cropped = Crop-ToInk $raw 1 1 0 $ink
         Save-Bmp $cropped ("greg_{0}{1}.png" -f ($i + 1), $sfx)
         $cropped.Dispose()
