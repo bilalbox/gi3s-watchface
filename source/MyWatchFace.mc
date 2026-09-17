@@ -1,28 +1,23 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // MyWatchFace.mc  –  Garmin Instinct 3 Solar 45 mm
 //
-// Layout (top → bottom):
-//   Porthole      │  HR (upper, xs) · steps (lower, md; xs past 9999), numbers only
-//   TIME          │  stacked HH/MM, tabular Arabic-Indic digits, cy≈59
-//   Temperature   │  م° unit then LTR number · centred on the porthole axis
-//   Weekday       │  full Arabic name bitmap · centred
-//   Hijri date    │  month bitmap + day  (no year)
-//   Gregorian     │  month bitmap + day  (no year, ~12 % smaller than Hijri)
-//   Battery bar   │  bottom, inset to the panel's visible span
-//   Body battery  │  left edge, inset to the panel's visible span
+// Layout A (top → bottom), 176×176 semi-octagon:
+//   Header  y=15…70   │  left: weekday + Gregorian date; porthole: weather + temp
+//   Divider y=75…85   │  Hijri month + day, centred (the long row; uses gutters)
+//   Time    y=90…135  │  single-row HH:MM, tabular Arabic-Indic, centred
+//   Shelf   y=140…168 │  steps + body battery, then a slim battery gauge
 //
 // Panel geometry (measured, not assumed):
 //   The display is a 176×176 *semi-octagon*, not a circle. Corners are rounded
-//   chamfers, so the usable span narrows sharply toward the top and bottom. Two
-//   consequences drive the constants below:
+//   chamfers, so the usable span narrows sharply toward the top and bottom.
+//   The top-right corner is the hardware porthole, so that chamfer is not cut.
 //     · At y=172 only x 38–137 is on-panel, and y=175 does not exist at all.
 //       A bar drawn 0…175 is invisible below 22 % and saturated above 78 %.
-//     · At the Gregorian row's bottom edge (y=166) the panel spans only x 29–146,
-//       which is what caps DATE_SEAM_MAX.
+//     · Gregorian sits in the header because even أغسطس + day is ~76 px and
+//       clears the porthole. Hijri (up to ~125 px) uses the full divider span.
 //
 // Digit tiers are *tabular*: every glyph in a set shares one cell width, so a
-// multi-digit string never changes width as its value changes. Without this the
-// stacked hour and minute rows, centred independently, sat up to 21 px apart.
+// multi-digit string never changes width as its value changes.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import Toybox.Graphics;
@@ -31,7 +26,6 @@ import Toybox.Application;
 import Toybox.Application.Properties;
 import Toybox.Time.Gregorian;
 import Toybox.Lang;
-import Toybox.Activity;
 import Toybox.ActivityMonitor;
 import Toybox.SensorHistory;
 import Toybox.Timer;
@@ -69,9 +63,9 @@ module Theme {
     }
 
     // NOTE: this panel is 1 bpp - its palette is black and white only. Any grey
-    // snaps to one of the two, so a "grey track" for the bars renders as either
-    // invisible (dark theme) or solid (light theme). Both bars therefore draw a
-    // foreground outline as their track and fill proportionally inside it.
+    // snaps to one of the two, so a "grey track" for the gauge would render as
+    // either invisible (dark theme) or solid (light theme). The battery bar
+    // therefore draws a foreground outline as its track and fills inside it.
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -192,8 +186,8 @@ class GlyphSet {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // The four tiers
-//   clock : stacked HH/MM              sm : Hijri day
-//   md    : porthole steps, temperature xs : porthole HR, Gregorian day
+//   clock : inline HH:MM               sm : Hijri day
+//   md    : shelf steps, temperature    xs : Gregorian day, 5-digit steps
 // ─────────────────────────────────────────────────────────────────────────────
 
 module Glyphs {
@@ -201,6 +195,8 @@ module Glyphs {
     var sm    = null;
     var md    = null;
     var xs    = null;
+    const COLON_W   = 6;
+    const COLON_DOT = 4;
 
     function build() as Void {
         clock = new GlyphSet(
@@ -258,13 +254,21 @@ module Glyphs {
         xs.ensure(mode);
     }
 
-    // Stacked 24 h time. Both rows share one tabular width, so they align exactly.
-    function drawStacked24h(dc, hourStr as String, minStr as String,
-                            cx as Number, cyCenter as Number, stackGap as Number) as Void {
+    // Single-row 24 h time. Colon is two filled squares — there is no colon sprite.
+    function drawInline24h(dc, hourStr as String, minStr as String,
+                           cx as Number, yTop as Number) as Void {
+        var gap    = 2;
+        var hhW    = clock.measure(hourStr);
+        var mmW    = clock.measure(minStr);
+        var total  = hhW + gap + COLON_W + gap + mmW;
+        var x      = cx - total / 2;
         var rowH   = clock.cellHeight();
-        var hourY  = cyCenter - (rowH * 2 + stackGap) / 2;
-        clock.drawCentered(dc, hourStr, cx, hourY + rowH / 2);
-        clock.drawCentered(dc, minStr,  cx, hourY + rowH + stackGap + rowH / 2);
+        clock.drawLeft(dc, hourStr, x, yTop);
+        var colX = x + hhW + gap;
+        var dotX = colX + (COLON_W - COLON_DOT) / 2;
+        dc.fillRectangle(dotX, yTop + 10, COLON_DOT, COLON_DOT);
+        dc.fillRectangle(dotX, yTop + rowH - 10 - COLON_DOT, COLON_DOT, COLON_DOT);
+        clock.drawLeft(dc, minStr, colX + COLON_W + gap, yTop);
     }
 }
 
@@ -529,8 +533,6 @@ class MyProjectApp extends Application.AppBase {
 
 class MyWatchFace extends WatchUi.WatchFace {
     var timer;
-    const HEART_RATE_PLACEHOLDER = "--";
-    var cachedHrDisplay = HEART_RATE_PLACEHOLDER;
     var lastWeatherFetchTime     = 0;
     var cachedConditions         = null;
     const WEATHER_UPDATE_INTERVAL = 15 * 60;
@@ -540,7 +542,6 @@ class MyWatchFace extends WatchUi.WatchFace {
     var cachedSteps = 0;
     var cachedBodyBattery = null;
     var cachedGregorianInfo = null;
-    var cachedHijri = null;
 
     // Porthole — resolved from WatchUi.getSubscreen(); literals are the fallback
     // for the 45 mm / 50 mm panel (62×62 box at x=113, y=0 → centre 143.5, 31.5).
@@ -548,40 +549,25 @@ class MyWatchFace extends WatchUi.WatchFace {
     const PORTHOLE_CY_FALLBACK = 31;
     var portholeCx = PORTHOLE_CX_FALLBACK;
     var portholeCy = PORTHOLE_CY_FALLBACK;
-    // Rows sit ±8 px from the porthole centre. With the xs (h=11) and md (h=13)
-    // tiers that puts the two-row block at y 17.5–45.5, centred on 31.5, and keeps
-    // both rows inside a 55.3 px chord.
-    const PORTHOLE_HR_DY    = -8;
-    const PORTHOLE_STEPS_DY = 8;
 
-    // Vertical layout (px from the top of the 176 px display). Spacing is budgeted
-    // against the *tallest* bitmap in each set, so no month/weekday combination can
-    // collide: clock 20–98, weekday 102–124, Hijri 127–147, Gregorian 150–166.
-    const CY_TIME         = 59;
-    const TIME_STACK_GAP  = 4;
-    const TIME_CX_OFFSET  = -26;
-    const Y_TEMP          = 92;
-    const Y_WEEKDAY       = 113;
-    const Y_HIJRI         = 137;
-    const Y_GREGORIAN     = 158;
+    // Layout A. Weekday and Gregorian are left-aligned; time and Hijri are centred.
+    const CHAMFER         = 38;
+    const X_HEADER        = 24;
+    const Y_WEEKDAY       = 18;
+    const Y_GREGORIAN     = 55;
+    const Y_HIJRI         = 80;
+    const X_DIVIDER_MIN   = 20;
+    const X_DIVIDER_MAX   = 156;
+    const Y_TIME          = 94;
+    const Y_SHELF         = 146;
     const DATE_MONTH_GAP  = 6;
-    // Both date rows share this right edge. Capped because the Gregorian row's own
-    // bottom (y=166) only spans x 29–146 — a wider seam would clip the day digits.
-    const DATE_SEAM_MAX   = 144;
 
-    // Bars are inset to the panel's visible span so 0-100 % maps onto real pixels,
-    // and kept 2-3 px clear of the chamfer so a small difference between the SDK
-    // bezel mask and the physical panel cannot clip them. Each is a 1 px outline
-    // (the track) with a proportional fill inside - see the note in Theme.
+    // Gauge sits on the shelf, inset to the panel's visible span so 0-100 % maps
+    // onto real pixels. 1 px outline track, proportional fill — see Theme.
     const X_BATTERY_BAR = 42;
     const W_BATTERY_BAR = 92;
-    const Y_BATTERY_BAR = 170;
+    const Y_BATTERY_BAR = 162;
     const H_BATTERY_BAR = 4;
-    const X_BODY_BATTERY_BAR = 6;
-    const W_BODY_BATTERY_BAR = 4;
-    const Y_BODY_BATTERY_TOP = 38;
-    const H_BODY_BATTERY_BAR = 100;
-    const MIN_BB_FILL_PX = 5;
     const DEBUG_BODY_BATTERY = -1; // hardcoded % for layout debug; -1 for live data
 
     function initialize() {
@@ -628,8 +614,8 @@ class MyWatchFace extends WatchUi.WatchFace {
     function onMinuteUiTick() as Void {
         var g = Gregorian.info(Time.now(), Time.FORMAT_SHORT);
         cachedGregorianInfo = g;
-        // Converted once here rather than per draw call.
-        cachedHijri = HijriHelpers.gregorianToHijri(g.year, g.month, g.day, getHijriDayOffset());
+        // Hijri is converted in onUpdate from the live offset so Connect / on-watch
+        // settings cannot leave a stale month on screen until the next minute tick.
         if (Toybox has :Weather) {
             var now = Time.now().value();
             if (cachedConditions == null ||
@@ -642,7 +628,6 @@ class MyWatchFace extends WatchUi.WatchFace {
             }
         }
         updateActivityData();
-        refreshCachedHeartRate();
         refreshCachedBodyBattery();
         WatchUi.requestUpdate();
     }
@@ -660,11 +645,7 @@ class MyWatchFace extends WatchUi.WatchFace {
             g = Gregorian.info(Time.now(), Time.FORMAT_SHORT);
             cachedGregorianInfo = g;
         }
-        var hijri = cachedHijri;
-        if (hijri == null) {
-            hijri = HijriHelpers.gregorianToHijri(g.year, g.month, g.day, getHijriDayOffset());
-            cachedHijri = hijri;
-        }
+        var hijri = HijriHelpers.gregorianToHijri(g.year, g.month, g.day, getHijriDayOffset());
         // One ensure per draw, shared by the weekday and both date rows.
         var hijriMonth = (hijri as Dictionary)[:month] as Number;
         ArabicLabels.ensure(hijriMonth.toNumber(), g.month, g.day_of_week, mode);
@@ -674,12 +655,13 @@ class MyWatchFace extends WatchUi.WatchFace {
         dc.setColor(bg, bg);
         dc.clear();
         dc.setColor(fg, Graphics.COLOR_TRANSPARENT);
-        drawTime(dc);
-        drawTemperature(dc);
-        drawPortholeContents(dc);
         drawWeekday(dc);
-        drawCenterDates(dc, g, hijri);
-        drawBodyBatteryBar(dc, fg);
+        drawHeaderGregorian(dc, g);
+        drawWeatherIcon(dc);
+        drawTemperature(dc);
+        drawHijriDivider(dc, hijri);
+        drawTime(dc);
+        drawShelfMetrics(dc);
         drawBatteryBar(dc, fg);
     }
 
@@ -688,14 +670,13 @@ class MyWatchFace extends WatchUi.WatchFace {
     // ─────────────────────────────────────────────────────────────────────────
 
     function drawTime(dc) {
-        var parts   = TimeHelpers.getHourMinute24(System.getClockTime());
-        var cx      = dc.getWidth() / 2 + TIME_CX_OFFSET;
-        Glyphs.drawStacked24h(dc, parts[:hour] as String, parts[:min] as String,
-                              cx, CY_TIME, TIME_STACK_GAP);
+        var parts = TimeHelpers.getHourMinute24(System.getClockTime());
+        Glyphs.drawInline24h(dc, parts[:hour] as String, parts[:min] as String,
+                             dc.getWidth() / 2, Y_TIME);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // ② Temperature under the porthole
+    // Temperature in the porthole
     //
     // RTL expression, LTR number. The unit is logically [°][م]; in a right-to-left
     // run those reverse, so the unit paints as م° at the left and the number sits
@@ -708,75 +689,135 @@ class MyWatchFace extends WatchUi.WatchFace {
     function drawTemperature(dc) {
         var numStr = "--";
         if (Toybox has :Weather && cachedConditions != null && cachedConditions.temperature != null) {
-            // Round rather than truncate: -0.6 °C should read -1, not 0.
             var c = Math.round(cachedConditions.temperature.toFloat()).toNumber();
             numStr = c.format("%d");
         }
-        Glyphs.md.drawCentered(dc, "m*" + numStr, portholeCx, Y_TEMP);
+        Glyphs.md.drawCentered(dc, "m*" + numStr, portholeCx, portholeCy + 11);
     }
 
     function drawWeekday(dc) {
         var bmp = ArabicLabels.dowBmp;
         if (bmp == null) { return; }
-        dc.drawBitmap(
-            dc.getWidth() / 2 - bmp.getWidth() / 2,
-            Y_WEEKDAY - bmp.getHeight() / 2,
-            bmp
-        );
+        dc.drawBitmap(X_HEADER, Y_WEEKDAY, bmp);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // ③ Porthole — position is the legend (HR above, steps below)
-    // ─────────────────────────────────────────────────────────────────────────
-
-    function drawPortholeContents(dc) {
-        Glyphs.xs.drawCentered(dc, cachedHrDisplay, portholeCx, portholeCy + PORTHOLE_HR_DY);
-        var steps = cachedSteps.toString();
-        stepsGlyphSet(steps).drawCentered(dc, steps, portholeCx, portholeCy + PORTHOLE_STEPS_DY);
+    // 1-bit porthole weather. No PNG budget: filled circles and squares only.
+    // kind: -1 none, 0 sun, 1 cloud, 2 rain, 3 storm, 4 snow.
+    function weatherIconKind() as Number {
+        if (!(Toybox has :Weather) || cachedConditions == null || cachedConditions.condition == null) {
+            return -1;
+        }
+        var c = cachedConditions.condition as Number;
+        // Storm
+        if ((Weather has :CONDITION_THUNDERSTORMS) && c == Weather.CONDITION_THUNDERSTORMS) { return 3; }
+        if ((Weather has :CONDITION_SCATTERED_THUNDERSTORMS) && c == Weather.CONDITION_SCATTERED_THUNDERSTORMS) { return 3; }
+        if ((Weather has :CONDITION_CHANCE_OF_THUNDERSTORMS) && c == Weather.CONDITION_CHANCE_OF_THUNDERSTORMS) { return 3; }
+        if ((Weather has :CONDITION_TORNADO) && c == Weather.CONDITION_TORNADO) { return 3; }
+        if ((Weather has :CONDITION_HURRICANE) && c == Weather.CONDITION_HURRICANE) { return 3; }
+        if ((Weather has :CONDITION_TROPICAL_STORM) && c == Weather.CONDITION_TROPICAL_STORM) { return 3; }
+        // Rain
+        if ((Weather has :CONDITION_RAIN) && c == Weather.CONDITION_RAIN) { return 2; }
+        if ((Weather has :CONDITION_LIGHT_RAIN) && c == Weather.CONDITION_LIGHT_RAIN) { return 2; }
+        if ((Weather has :CONDITION_HEAVY_RAIN) && c == Weather.CONDITION_HEAVY_RAIN) { return 2; }
+        if ((Weather has :CONDITION_SHOWERS) && c == Weather.CONDITION_SHOWERS) { return 2; }
+        if ((Weather has :CONDITION_SCATTERED_SHOWERS) && c == Weather.CONDITION_SCATTERED_SHOWERS) { return 2; }
+        if ((Weather has :CONDITION_LIGHT_SHOWERS) && c == Weather.CONDITION_LIGHT_SHOWERS) { return 2; }
+        if ((Weather has :CONDITION_HEAVY_SHOWERS) && c == Weather.CONDITION_HEAVY_SHOWERS) { return 2; }
+        if ((Weather has :CONDITION_DRIZZLE) && c == Weather.CONDITION_DRIZZLE) { return 2; }
+        if ((Weather has :CONDITION_FREEZING_RAIN) && c == Weather.CONDITION_FREEZING_RAIN) { return 2; }
+        if ((Weather has :CONDITION_HAIL) && c == Weather.CONDITION_HAIL) { return 2; }
+        if ((Weather has :CONDITION_CHANCE_OF_SHOWERS) && c == Weather.CONDITION_CHANCE_OF_SHOWERS) { return 2; }
+        if ((Weather has :CONDITION_CLOUDY_CHANCE_OF_RAIN) && c == Weather.CONDITION_CLOUDY_CHANCE_OF_RAIN) { return 2; }
+        if ((Weather has :CONDITION_UNKNOWN_PRECIPITATION) && c == Weather.CONDITION_UNKNOWN_PRECIPITATION) { return 2; }
+        // Snow / mixed
+        if ((Weather has :CONDITION_SNOW) && c == Weather.CONDITION_SNOW) { return 4; }
+        if ((Weather has :CONDITION_LIGHT_SNOW) && c == Weather.CONDITION_LIGHT_SNOW) { return 4; }
+        if ((Weather has :CONDITION_HEAVY_SNOW) && c == Weather.CONDITION_HEAVY_SNOW) { return 4; }
+        if ((Weather has :CONDITION_FLURRIES) && c == Weather.CONDITION_FLURRIES) { return 4; }
+        if ((Weather has :CONDITION_SLEET) && c == Weather.CONDITION_SLEET) { return 4; }
+        if ((Weather has :CONDITION_WINTRY_MIX) && c == Weather.CONDITION_WINTRY_MIX) { return 4; }
+        if ((Weather has :CONDITION_ICE) && c == Weather.CONDITION_ICE) { return 4; }
+        if ((Weather has :CONDITION_ICE_SNOW) && c == Weather.CONDITION_ICE_SNOW) { return 4; }
+        if ((Weather has :CONDITION_RAIN_SNOW) && c == Weather.CONDITION_RAIN_SNOW) { return 4; }
+        if ((Weather has :CONDITION_LIGHT_RAIN_SNOW) && c == Weather.CONDITION_LIGHT_RAIN_SNOW) { return 4; }
+        if ((Weather has :CONDITION_HEAVY_RAIN_SNOW) && c == Weather.CONDITION_HEAVY_RAIN_SNOW) { return 4; }
+        if ((Weather has :CONDITION_CHANCE_OF_SNOW) && c == Weather.CONDITION_CHANCE_OF_SNOW) { return 4; }
+        if ((Weather has :CONDITION_CHANCE_OF_RAIN_SNOW) && c == Weather.CONDITION_CHANCE_OF_RAIN_SNOW) { return 4; }
+        if ((Weather has :CONDITION_CLOUDY_CHANCE_OF_SNOW) && c == Weather.CONDITION_CLOUDY_CHANCE_OF_SNOW) { return 4; }
+        if ((Weather has :CONDITION_CLOUDY_CHANCE_OF_RAIN_SNOW) && c == Weather.CONDITION_CLOUDY_CHANCE_OF_RAIN_SNOW) { return 4; }
+        // Sun / clear
+        if ((Weather has :CONDITION_CLEAR) && c == Weather.CONDITION_CLEAR) { return 0; }
+        if ((Weather has :CONDITION_FAIR) && c == Weather.CONDITION_FAIR) { return 0; }
+        if ((Weather has :CONDITION_PARTLY_CLEAR) && c == Weather.CONDITION_PARTLY_CLEAR) { return 0; }
+        if ((Weather has :CONDITION_MOSTLY_CLEAR) && c == Weather.CONDITION_MOSTLY_CLEAR) { return 0; }
+        if ((Weather has :CONDITION_THIN_CLOUDS) && c == Weather.CONDITION_THIN_CLOUDS) { return 0; }
+        return 1;
     }
 
-    // Steps are always exact. Five digits do not fit the md tier, so past 9999 the
-    // row drops to xs: 5 cells = 45 px inside a 56.7 px chord.
-    //
-    // This replaced an earlier plan to abbreviate 10 000+ as thousands-plus-decimal
-    // (12.3). Rendered at 13 px the Arabic decimal separator is an 8-pixel mark and
-    // Arabic-Indic zero is an 11-pixel mark at the same height - so 12.3 read as
-    // 1203, a 10x misread. Dropping a tier keeps the count exact and unambiguous.
+    function drawWeatherIcon(dc) as Void {
+        var kind = weatherIconKind();
+        if (kind < 0) { return; }
+        var cx = portholeCx;
+        var cy = portholeCy - 9;
+        if (kind == 0) {
+            dc.fillCircle(cx, cy, 3);
+            dc.fillRectangle(cx - 1, cy - 8, 2, 3);
+            dc.fillRectangle(cx - 1, cy + 5, 2, 3);
+            dc.fillRectangle(cx - 8, cy - 1, 3, 2);
+            dc.fillRectangle(cx + 5, cy - 1, 3, 2);
+            dc.fillRectangle(cx - 6, cy - 6, 2, 2);
+            dc.fillRectangle(cx + 4, cy - 6, 2, 2);
+            dc.fillRectangle(cx - 6, cy + 4, 2, 2);
+            dc.fillRectangle(cx + 4, cy + 4, 2, 2);
+            return;
+        }
+        if (kind == 3) {
+            dc.fillRectangle(cx - 1, cy - 6, 2, 5);
+            dc.fillRectangle(cx - 4, cy - 1, 5, 2);
+            dc.fillRectangle(cx - 1, cy + 1, 2, 6);
+            return;
+        }
+        if (kind == 4) {
+            dc.fillRectangle(cx - 1, cy - 5, 2, 10);
+            dc.fillRectangle(cx - 5, cy - 1, 10, 2);
+            dc.fillRectangle(cx - 3, cy - 3, 2, 2);
+            dc.fillRectangle(cx + 1, cy + 1, 2, 2);
+            return;
+        }
+        dc.fillCircle(cx - 3, cy + 1, 4);
+        dc.fillCircle(cx + 3, cy, 5);
+        dc.fillCircle(cx, cy - 2, 4);
+        if (kind == 2) {
+            dc.fillRectangle(cx - 4, cy + 6, 1, 3);
+            dc.fillRectangle(cx,     cy + 7, 1, 3);
+            dc.fillRectangle(cx + 4, cy + 6, 1, 3);
+        }
+    }
+
+    // Steps stay exact. Five digits do not fit the md tier, so past 9999 the
+    // row drops to xs. The Arabic decimal separator at this size reads as a
+    // zero, so abbreviation is not an option.
     function stepsGlyphSet(text as String) {
         return (text.length() > 4) ? Glyphs.xs : Glyphs.md;
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // ④ Date rows — shared right seam, block centred
-    //
-    // In RTL display order a row reads [month][gap][day], so the day's right edge
-    // is the natural reading anchor. Both rows are aligned to one seam, and the
-    // wider row is what centres the block.
-    // ─────────────────────────────────────────────────────────────────────────
+    function drawHeaderGregorian(dc, g) {
+        var gregBmp = ArabicLabels.gregBmp;
+        if (gregBmp == null) { return; }
+        var gregDay = g.day.format("%02d");
+        var gregW = gregBmp.getWidth() + DATE_MONTH_GAP + Glyphs.xs.measure(gregDay);
+        drawDateRow(dc, gregBmp, gregDay, Glyphs.xs, X_HEADER + gregW, Y_GREGORIAN);
+    }
 
-    function drawCenterDates(dc, g, hijri) {
-        var cx = dc.getWidth() / 2;
+    function drawHijriDivider(dc, hijri) {
         var hijriBmp = ArabicLabels.hijriBmp;
-        var gregBmp  = ArabicLabels.gregBmp;
-
+        if (hijriBmp == null) { return; }
         var hijriDay = ((hijri as Dictionary)[:day] as Number).toNumber().format("%02d");
-        var gregDay  = g.day.format("%02d");
-
-        var hijriW = (hijriBmp == null) ? 0
-                   : hijriBmp.getWidth() + DATE_MONTH_GAP + Glyphs.sm.measure(hijriDay);
-        var gregW  = (gregBmp == null) ? 0
-                   : gregBmp.getWidth() + DATE_MONTH_GAP + Glyphs.xs.measure(gregDay);
-
-        var blockW = (hijriW > gregW) ? hijriW : gregW;
-        var seam = cx + blockW / 2;
-        if (seam > DATE_SEAM_MAX) { seam = DATE_SEAM_MAX; }
-
-        if (hijriBmp != null) {
-            drawDateRow(dc, hijriBmp, hijriDay, Glyphs.sm, seam, Y_HIJRI);
-        }
-        if (gregBmp != null) {
-            drawDateRow(dc, gregBmp, gregDay, Glyphs.xs, seam, Y_GREGORIAN);
-        }
+        var hijriW = hijriBmp.getWidth() + DATE_MONTH_GAP + Glyphs.sm.measure(hijriDay);
+        var seam = dc.getWidth() / 2 + hijriW / 2;
+        if (seam > X_DIVIDER_MAX) { seam = X_DIVIDER_MAX; }
+        if (seam - hijriW < X_DIVIDER_MIN) { seam = X_DIVIDER_MIN + hijriW; }
+        drawDateRow(dc, hijriBmp, hijriDay, Glyphs.sm, seam, Y_HIJRI);
     }
 
     function drawDateRow(dc, monthBmp, dayStr as String, set, xRight as Number, yMid as Number) as Void {
@@ -786,35 +827,40 @@ class MyWatchFace extends WatchUi.WatchFace {
         dc.drawBitmap(xRight - dayW - DATE_MONTH_GAP - mw, yMid - monthBmp.getHeight() / 2, monthBmp);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // ⑤ Body battery bar (left edge)
-    // ─────────────────────────────────────────────────────────────────────────
-
-    function drawBodyBatteryBar(dc, fg as Number) {
-        var bbValue = null;
-        if (DEBUG_BODY_BATTERY >= 0) {
-            bbValue = DEBUG_BODY_BATTERY;
-        } else if (cachedBodyBattery != null) {
-            bbValue = cachedBodyBattery;
+    function visibleLeft(y as Number) as Number {
+        var left = 0;
+        if (y < CHAMFER) { left = CHAMFER - y; }
+        if (y > 175 - CHAMFER) {
+            var inset = y - (175 - CHAMFER);
+            if (inset > left) { left = inset; }
         }
-        dc.setPenWidth(1);
-        dc.setColor(fg, Graphics.COLOR_TRANSPARENT);
-        dc.drawRectangle(X_BODY_BATTERY_BAR, Y_BODY_BATTERY_TOP,
-                         W_BODY_BATTERY_BAR, H_BODY_BATTERY_BAR);
-        if (bbValue == null || bbValue <= 0) { return; }
-        // Fill the 2 px channel inside the outline, growing upward from the base.
-        var innerH = H_BODY_BATTERY_BAR - 2;
-        var fillH = (innerH.toFloat() * bbValue.toFloat() / 100.0).toNumber();
-        if (fillH < MIN_BB_FILL_PX) { fillH = MIN_BB_FILL_PX; }
-        if (fillH > innerH) { fillH = innerH; }
-        dc.fillRectangle(X_BODY_BATTERY_BAR + 1,
-                         Y_BODY_BATTERY_TOP + H_BODY_BATTERY_BAR - 1 - fillH,
-                         W_BODY_BATTERY_BAR - 2, fillH);
+        return left;
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // ⑥ Battery bar
-    // ─────────────────────────────────────────────────────────────────────────
+    function visibleRight(y as Number) as Number {
+        if (y > 175 - CHAMFER) {
+            return 175 - (y - (175 - CHAMFER));
+        }
+        return 175;
+    }
+
+    function drawShelfMetrics(dc) {
+        var steps = cachedSteps.toString();
+        var set = stepsGlyphSet(steps);
+        var L = visibleLeft(Y_SHELF);
+        var R = visibleRight(Y_SHELF);
+        var leftCx  = L + (88 - L) / 2;
+        var rightCx = 88 + (R - 88) / 2;
+        set.drawCentered(dc, steps, leftCx, Y_SHELF + set.cellHeight() / 2);
+
+        var bbStr = "--";
+        if (DEBUG_BODY_BATTERY >= 0) {
+            bbStr = DEBUG_BODY_BATTERY.format("%d");
+        } else if (cachedBodyBattery != null) {
+            bbStr = (cachedBodyBattery as Number).format("%d");
+        }
+        Glyphs.md.drawCentered(dc, bbStr, rightCx, Y_SHELF + Glyphs.md.cellHeight() / 2);
+    }
 
     function drawBatteryBar(dc, fg as Number) {
         var pct = 0.0;
@@ -824,7 +870,6 @@ class MyWatchFace extends WatchUi.WatchFace {
         dc.setPenWidth(1);
         dc.setColor(fg, Graphics.COLOR_TRANSPARENT);
         dc.drawRectangle(X_BATTERY_BAR, Y_BATTERY_BAR, W_BATTERY_BAR, H_BATTERY_BAR);
-        // Fill the 2 px channel inside the outline, growing from the left.
         var innerW = W_BATTERY_BAR - 2;
         var fillW = (innerW.toFloat() * pct).toNumber();
         if (fillW > 0) {
@@ -864,38 +909,6 @@ class MyWatchFace extends WatchUi.WatchFace {
                 lastSystemStatsFetchTime = now;
             }
         }
-    }
-
-    function refreshCachedHeartRate() as Void {
-        var iter   = ActivityMonitor.getHeartRateHistory(new Time.Duration(60), false);
-        var sample = iter.next();
-        while (sample != null) {
-            if (sample.heartRate != null &&
-                sample.heartRate != ActivityMonitor.INVALID_HR_SAMPLE) {
-                cachedHrDisplay = sample.heartRate.toString();
-                return;
-            }
-            sample = iter.next();
-        }
-        var info = Activity.getActivityInfo();
-        if (info != null && info.currentHeartRate != null) {
-            cachedHrDisplay = info.currentHeartRate.toString();
-            return;
-        }
-        if ((Toybox has :SensorHistory) && (SensorHistory has :getHeartRateHistory)) {
-            var hrIter = SensorHistory.getHeartRateHistory({
-                :period => 1,
-                :order  => SensorHistory.ORDER_NEWEST_FIRST
-            });
-            if (hrIter != null) {
-                var hrSample = hrIter.next();
-                if (hrSample != null && hrSample.data != null) {
-                    cachedHrDisplay = hrSample.data.toNumber().toString();
-                    return;
-                }
-            }
-        }
-        cachedHrDisplay = HEART_RATE_PLACEHOLDER;
     }
 
     function readBodyBatteryFromIterator(iter) as Number or Null {
