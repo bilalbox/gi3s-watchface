@@ -1,8 +1,10 @@
-# My Watch Face for Garmin Instinct 3 Solar 45mm
+# Instinct 3 Solar Arabic watch face (gi3s)
 
 An Arabic-only Connect IQ watch face for the **Garmin Instinct 3 Solar 45mm**: stacked Noto Kufi Arabic-Indic time, dual calendar (Hijri + Gregorian) without years, weekday, temperature in م°, and an activity porthole.
 
 > **Note:** Source is intentionally monolithic in a single `MyWatchFace.mc` file for easy sharing and review.
+
+Garmin `developer_key.pem` / `.der` stay local (gitignored). Never force-add them.
 
 ## Layout
 
@@ -163,3 +165,7 @@ monkeydo watchface.prg instinct3solar45mm
 ## Screenshot
 
 ![Watch face preview](watchface_preview.png)
+
+## License
+
+MIT — see [LICENSE](LICENSE).

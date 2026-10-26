@@ -12,6 +12,9 @@ mir/
 
 # --- Signing keys (treat like secrets on a public repo) ---
 developer_key*
+*.pem
+*.der
+!scripts/**/*.pem
 
 # --- Simulator / IDE plugin droppings (paths, last run, local prefs) ---
 *-settings.json
