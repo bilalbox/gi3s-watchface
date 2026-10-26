@@ -14,7 +14,6 @@ mir/
 developer_key*
 *.pem
 *.der
-!scripts/**/*.pem
 
 # --- Simulator / IDE plugin droppings (paths, last run, local prefs) ---
 *-settings.json
