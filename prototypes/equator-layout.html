@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Instinct 3 equator layout test</title>
+<!--
+  Throwaway prototype. Layout A won and is now the draw path in source/MyWatchFace.mc.
+  Question: does the proposed four-zone equator layout fit the Instinct 3 Solar
+  45 mm 176×176 semi-octagon using the shipping sprites?
+  Variants via ?variant=A|B|C  —  fixture via ?fixture=typical|worst
+-->
+<style>
+  :root {
+    --bg: #14120e;
+    --ink: #ece6d6;
+    --muted: #8a8373;
+    --fail: #e23d2b;
+    --pass: #7cb86a;
+    --warn: #d4a017;
+    --panel: #000;
+    --zone-h: rgba(64, 180, 220, .22);
+    --zone-d: rgba(212, 160, 23, .28);
+    --zone-t: rgba(120, 200, 90, .22);
+    --zone-s: rgba(210, 90, 180, .22);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--ink); }
+  body {
+    font: 13px/1.45 "Cascadia Mono", "Consolas", ui-monospace, monospace;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+  header.q {
+    padding: 14px 20px 8px;
+    border-bottom: 1px solid #2a2720;
+  }
+  header.q h1 { font-size: 14px; font-weight: 600; margin: 0 0 4px; letter-spacing: .02em; }
+  header.q p { margin: 0; color: var(--muted); max-width: 72rem; }
+  .lab {
+    flex: 1;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 28px;
+    padding: 20px 20px 88px;
+    align-items: start;
+  }
+  .watch-col { display: flex; gap: 8px; }
+  .ruler {
+    width: 36px;
+    height: 528px;
+    position: relative;
+    color: var(--muted);
+    font-size: 10px;
+  }
+  .ruler i {
+    position: absolute;
+    right: 0;
+    transform: translateY(-50%);
+    white-space: nowrap;
+    padding-right: 6px;
+    border-right: 1px solid #5a5448;
+    line-height: 1;
+  }
+  .ruler i.zone { color: #c4b89a; border-color: #c4b89a; }
+  .frame {
+    width: 528px;
+    height: 528px;
+    position: relative;
+    background: #2a2318;
+    box-shadow: inset 0 0 0 1px #3d3426;
+  }
+  .panel-wrap {
+    width: 176px;
+    height: 176px;
+    transform: scale(3);
+    transform-origin: top left;
+    position: relative;
+  }
+  .panel {
+    width: 176px;
+    height: 176px;
+    background: #000;
+    position: absolute;
+    inset: 0;
+    clip-path: polygon(
+      38px 0, 176px 0, 176px 138px,
+      138px 176px, 38px 176px, 0 138px, 0 38px
+    );
+    overflow: hidden;
+  }
+  .panel img { image-rendering: pixelated; display: block; position: absolute; }
+  .face, .zones, .ghost { position: absolute; inset: 0; }
+  .ghost { pointer-events: none; }
+  .porthole-ring {
+    position: absolute;
+    left: 113px; top: 0;
+    width: 62px; height: 62px;
+    border: 1px solid #c45a1a;
+    border-radius: 50%;
+    box-sizing: border-box;
+    pointer-events: none;
+  }
+  .box {
+    position: absolute;
+    outline: 1px solid rgba(226, 61, 43, .85);
+    background: repeating-linear-gradient(
+      -45deg,
+      rgba(226, 61, 43, .18) 0 2px,
+      transparent 2px 4px
+    );
+    pointer-events: none;
+  }
+  .zone {
+    position: absolute;
+    left: 0; width: 176px;
+    pointer-events: none;
+  }
+  .zone.header { background: var(--zone-h); top: 15px; height: 55px; }
+  .zone.divider { background: var(--zone-d); top: 75px; height: 10px; }
+  .zone.time { background: var(--zone-t); top: 90px; height: 45px; }
+  .zone.shelf { background: var(--zone-s); top: 140px; height: 28px; }
+  .colon {
+    position: absolute;
+    width: 6px;
+    height: 37px;
+  }
+  .colon::before, .colon::after {
+    content: "";
+    position: absolute;
+    left: 1px;
+    width: 4px; height: 4px;
+    background: #fff;
+  }
+  .colon::before { top: 10px; }
+  .colon::after { bottom: 10px; }
+  .rule {
+    position: absolute;
+    height: 1px;
+    background: #fff;
+  }
+  .gauge {
+    position: absolute;
+    box-sizing: border-box;
+    border: 1px solid #fff;
+    background: transparent;
+  }
+  .gauge > b {
+    display: block;
+    height: 100%;
+    background: #fff;
+  }
+  .sun {
+    position: absolute;
+    width: 16px; height: 16px;
+  }
+  .sun svg { display: block; }
+  aside {
+    max-width: 42rem;
+    min-width: 28rem;
+  }
+  aside h2 {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .12em;
+    color: var(--muted);
+    margin: 0 0 8px;
+  }
+  table { width: 100%; border-collapse: collapse; margin: 0 0 18px; }
+  th, td { text-align: left; padding: 4px 8px 4px 0; vertical-align: top; border-bottom: 1px solid #2a2720; }
+  th { color: var(--muted); font-weight: 500; }
+  td.ok { color: var(--pass); }
+  td.bad { color: var(--fail); }
+  td.warn { color: var(--warn); }
+  .checks { margin: 0 0 18px; padding: 0; list-style: none; }
+  .checks li { padding: 3px 0 3px 18px; position: relative; }
+  .checks li::before { position: absolute; left: 0; }
+  .checks li.ok::before { content: "✓"; color: var(--pass); }
+  .checks li.bad::before { content: "×"; color: var(--fail); }
+  .checks li.warn::before { content: "!"; color: var(--warn); }
+  .toggles { display: flex; gap: 14px; flex-wrap: wrap; margin: 0 0 16px; }
+  .toggles label { color: var(--ink); cursor: pointer; }
+  .switcher {
+    position: fixed;
+    left: 50%;
+    bottom: 18px;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: #0c0b09;
+    color: var(--ink);
+    border: 1px solid #ece6d6;
+    padding: 8px 12px;
+    z-index: 20;
+  }
+  .switcher button {
+    background: transparent;
+    color: inherit;
+    border: 1px solid #8a8373;
+    width: 32px; height: 28px;
+    cursor: pointer;
+    font: inherit;
+  }
+  .switcher .lab-name { min-width: 18rem; text-align: center; }
+</style>
+</head>
+<body>
+<header class="q">
+  <h1>Equator layout test · Instinct 3 Solar 45 mm</h1>
+  <p>
+    Shipping sprites on a 176×176 semi-octagon (38 px chamfer) with the hardware
+    porthole at (144, 31) r=31. Zones from the spec. Arrow keys cycle variants.
+  </p>
+</header>
+<div class="lab">
+  <div class="watch-col">
+    <div class="ruler" id="ruler"></div>
+    <div class="frame">
+      <div class="panel-wrap">
+        <div class="panel">
+          <div class="zones" id="zones"></div>
+          <div class="face" id="face"></div>
+          <div class="porthole-ring"></div>
+        </div>
+        <div class="ghost" id="ghost"></div>
+      </div>
+    </div>
+  </div>
+  <aside>
+    <div class="toggles">
+      <label><input type="checkbox" id="showZones" checked> zone overlay</label>
+      <label><input type="checkbox" id="showHits" checked> collision hatch</label>
+      <label>
+        fixture
+        <select id="fixture">
+          <option value="typical">typical (Fri / Rabi I)</option>
+          <option value="worst">worst (Mon / Jumada I / 5-digit steps)</option>
+        </select>
+      </label>
+    </div>
+    <h2>Zone budget</h2>
+    <table id="budget"></table>
+    <h2>Collision checks</h2>
+    <ul class="checks" id="checks"></ul>
+    <h2>Placed elements</h2>
+    <table id="els"></table>
+  </aside>
+</div>
+<nav class="switcher">
+  <button type="button" id="prev" aria-label="Previous variant">←</button>
+  <div class="lab-name" id="variantLabel"></div>
+  <button type="button" id="next" aria-label="Next variant">→</button>
+</nav>
+<script>
+const IMG = "../resources/images";
+const PANEL = 176;
+const CHAMFER = 38;
+const PORTHOLE = { cx: 144, cy: 31, r: 31, x: 113, y: 0, w: 62, h: 62 };
+const ZONES = [
+  { id: "header",  name: "Header Block", y0: 15,  y1: 70,  color: "header" },
+  { id: "divider", name: "Divider Row",  y0: 75,  y1: 85,  color: "divider" },
+  { id: "time",    name: "Main Time",    y0: 90,  y1: 135, color: "time" },
+  { id: "shelf",   name: "Bottom Shelf", y0: 140, y1: 168, color: "shelf" },
+];
+const TIER = {
+  digit: { w: 30, h: 37, gap: 2 },
+  sm:    { w: 14, h: 17, gap: 0 },
+  md:    { w: 11, h: 13, gap: 1 },
+  xs:    { w:  9, h: 11, gap: 0 },
+};
+const DOW   = { 1:[38,17], 2:[52,22], 3:[53,18], 4:[55,21], 5:[65,19], 6:[53,19], 7:[51,19] };
+const HIJRI = { 1:[34,13], 2:[30,15], 3:[65,20], 4:[63,20], 5:[91,19], 6:[87,18], 7:[27,13], 8:[44,16], 9:[43,16], 10:[39,17], 11:[68,17], 12:[58,18] };
+const GREG  = { 1:[26,14], 2:[35,14], 3:[34,14], 4:[29,16], 5:[25,14], 6:[30,13], 7:[30,14], 8:[52,16], 9:[42,14], 10:[35,16], 11:[40,13], 12:[45,12] };
+const MD_EXTRA = { m: 12, "*": 6, "-": 7 };
+
+const VARIANTS = [
+  { key: "A", name: "Spec: weather porthole · Hijri divider" },
+  { key: "B", name: "Spec: HR/steps porthole · thin rule" },
+  { key: "C", name: "Shipping stacked face" },
+];
+
+const FIXTURES = {
+  typical: {
+    dow: 6, hijriMonth: 3, hijriDay: "15",
+    gregMonth: 8, gregDay: "28",
+    hour: "13", min: "17",
+    temp: "17", hr: "80", steps: "4367", bb: 72, bat: 0.64,
+  },
+  worst: {
+    dow: 2, hijriMonth: 5, hijriDay: "29",
+    gregMonth: 8, gregDay: "31",
+    hour: "08", min: "08",
+    temp: "-40", hr: "188", steps: "12345", bb: 8, bat: 0.12,
+  },
+};
+
+function params() {
+  const u = new URL(location.href);
+  return {
+    variant: (u.searchParams.get("variant") || "A").toUpperCase(),
+    fixture: u.searchParams.get("fixture") || "typical",
+  };
+}
+function setParams(next) {
+  const u = new URL(location.href);
+  Object.entries(next).forEach(([k, v]) => u.searchParams.set(k, v));
+  history.replaceState(null, "", u);
+}
+
+function spanAt(y) {
+  // Semi-octagon: top-left + both bottom corners chamfer. Top-right is the
+  // hardware porthole, so that corner is not cut.
+  let left = 0;
+  let right = PANEL - 1;
+  if (y < CHAMFER) left = CHAMFER - y;
+  if (y > PANEL - 1 - CHAMFER) {
+    const inset = y - (PANEL - 1 - CHAMFER);
+    left = Math.max(left, inset);
+    right = PANEL - 1 - inset;
+  }
+  return [left, right];
+}
+function inOctagon(x, y) {
+  if (y < 0 || y > PANEL - 1 || x < 0 || x > PANEL - 1) return false;
+  const [L, R] = spanAt(y);
+  return x >= L && x <= R;
+}
+function inPorthole(x, y) {
+  const dx = x - PORTHOLE.cx, dy = y - PORTHOLE.cy;
+  return dx * dx + dy * dy <= PORTHOLE.r * PORTHOLE.r;
+}
+function measure(tier, text) {
+  if (tier === "md") {
+    let w = 0;
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
+      w += (MD_EXTRA[ch] != null ? MD_EXTRA[ch] : TIER.md.w);
+      if (i) w += TIER.md.gap;
+    }
+    return w;
+  }
+  const t = TIER[tier];
+  return text.length * t.w + Math.max(0, text.length - 1) * t.gap;
+}
+function mdSrc(ch) {
+  if (ch === "m") return "md_meem.png";
+  if (ch === "*") return "md_degree.png";
+  if (ch === "-") return "md_minus.png";
+  return `md_${ch}.png`;
+}
+
+const els = [];
+function record(name, zone, box, flags) {
+  els.push(Object.assign({ name, zone, box }, flags || {}));
+  return box;
+}
+function img(src, x, y, w, h) {
+  const el = document.createElement("img");
+  el.src = `${IMG}/${src}`;
+  el.style.left = x + "px";
+  el.style.top = y + "px";
+  el.width = w;
+  el.height = h;
+  face.appendChild(el);
+  return el;
+}
+function digits(tier, text, x, yTop) {
+  const t = TIER[tier];
+  let cx = x;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    const src = tier === "md" ? mdSrc(ch) : `${tier}_${ch}.png`;
+    const w = tier === "md" && MD_EXTRA[ch] != null ? MD_EXTRA[ch] : t.w;
+    img(src, cx, yTop, w, t.h);
+    cx += w + t.gap;
+  }
+  return { x, y: yTop, w: measure(tier, text), h: t.h };
+}
+function dateRow(monthSrc, monthWH, day, dayTier, xRight, yMid) {
+  const dayW = measure(dayTier, day);
+  const dayBox = digits(dayTier, day, xRight - dayW, Math.round(yMid - TIER[dayTier].h / 2));
+  const mx = xRight - dayW - 6 - monthWH[0];
+  const my = Math.round(yMid - monthWH[1] / 2);
+  img(monthSrc, mx, my, monthWH[0], monthWH[1]);
+  const x = mx;
+  const y = Math.min(my, dayBox.y);
+  const b = Math.max(my + monthWH[1], dayBox.y + dayBox.h);
+  return { x, y, w: xRight - x, h: b - y };
+}
+
+const face = document.getElementById("face");
+const ghost = document.getElementById("ghost");
+const zonesEl = document.getElementById("zones");
+
+function sun(cx, cy) {
+  const wrap = document.createElement("div");
+  wrap.className = "sun";
+  wrap.style.left = (cx - 8) + "px";
+  wrap.style.top = (cy - 8) + "px";
+  wrap.innerHTML = `<svg viewBox="0 0 16 16" width="16" height="16">
+    <circle cx="8" cy="8" r="3" fill="#fff"/>
+    <g stroke="#fff" stroke-width="1" stroke-linecap="square">
+      <path d="M8 1v2M8 13v2M1 8h2M13 8h2M3 3l1.4 1.4M11.6 11.6L13 13M13 3l-1.4 1.4M4.4 11.6L3 13"/>
+    </g>
+  </svg>`;
+  face.appendChild(wrap);
+  return { x: cx - 8, y: cy - 8, w: 16, h: 16 };
+}
+
+function hhmm(hour, min, cx, yTop) {
+  const hhW = measure("digit", hour);
+  const colonW = 6;
+  const gap = 2;
+  const mmW = measure("digit", min);
+  const total = hhW + gap + colonW + gap + mmW;
+  const x = Math.round(cx - total / 2);
+  digits("digit", hour, x, yTop);
+  const col = document.createElement("div");
+  col.className = "colon";
+  col.style.left = (x + hhW + gap) + "px";
+  col.style.top = yTop + "px";
+  face.appendChild(col);
+  digits("digit", min, x + hhW + gap + colonW + gap, yTop);
+  return { x, y: yTop, w: total, h: 37 };
+}
+
+function gauge(x, y, w, h, fill) {
+  const g = document.createElement("div");
+  g.className = "gauge";
+  g.style.left = x + "px";
+  g.style.top = y + "px";
+  g.style.width = w + "px";
+  g.style.height = h + "px";
+  const b = document.createElement("b");
+  b.style.width = Math.max(0, Math.round((w - 2) * fill)) + "px";
+  g.appendChild(b);
+  face.appendChild(g);
+  return { x, y, w, h };
+}
+
+function layoutA(fx) {
+  const dow = DOW[fx.dow];
+  img(`dow_${fx.dow}.png`, 24, 18, dow[0], dow[1]);
+  record("weekday", "header", { x: 24, y: 18, w: dow[0], h: dow[1] });
+
+  const gr = GREG[fx.gregMonth];
+  const gregW = gr[0] + 6 + measure("xs", fx.gregDay);
+  const greg = dateRow(`greg_${fx.gregMonth}.png`, gr, fx.gregDay, "xs", 24 + gregW, 55);
+  record("gregorian date", "header", greg);
+
+  record("weather icon", "header", sun(PORTHOLE.cx, 22), { porthole: true });
+  const tempStr = "m*" + fx.temp;
+  const tw = measure("md", tempStr);
+  const temp = digits("md", tempStr, Math.round(PORTHOLE.cx - tw / 2), 36);
+  record("temperature", "header", temp, { porthole: true });
+
+  const hj = HIJRI[fx.hijriMonth];
+  const dateW = hj[0] + 6 + measure("sm", fx.hijriDay);
+  const hijri = dateRow(`hijri_${fx.hijriMonth}.png`, hj, fx.hijriDay, "sm", Math.round(88 + dateW / 2), 80);
+  record("hijri divider", "divider", hijri);
+
+  record("HH:MM", "time", hhmm(fx.hour, fx.min, 88, 94));
+
+  const stepsTier = fx.steps.length > 4 ? "xs" : "md";
+  const sw = measure(stepsTier, fx.steps);
+  const [sL, sR] = spanAt(148);
+  const leftCx = Math.round(sL + (88 - sL) / 2);
+  const rightCx = Math.round(88 + (sR - 88) / 2);
+  record("steps", "shelf", digits(stepsTier, fx.steps, leftCx - sw / 2, 146));
+  const bb = String(fx.bb);
+  const bw = measure("md", bb);
+  record("body battery", "shelf", digits("md", bb, rightCx - bw / 2, 146));
+  record("battery gauge", "shelf", gauge(Math.max(42, sL + 8), 162, Math.min(92, sR - sL - 16), 4, fx.bat));
+}
+
+function layoutB(fx) {
+  const dow = DOW[fx.dow];
+  img(`dow_${fx.dow}.png`, 24, 15, dow[0], dow[1]);
+  record("weekday", "header", { x: 24, y: 15, w: dow[0], h: dow[1] });
+
+  const hj = HIJRI[fx.hijriMonth];
+  const dateW = hj[0] + 6 + measure("sm", fx.hijriDay);
+  const hijriMid = 15 + dow[1] + 1 + Math.max(hj[1], TIER.sm.h) / 2;
+  const hijri = dateRow(`hijri_${fx.hijriMonth}.png`, hj, fx.hijriDay, "sm", 24 + dateW, hijriMid);
+  record("hijri date", "header", hijri);
+
+  const gr = GREG[fx.gregMonth];
+  const gregW = gr[0] + 6 + measure("xs", fx.gregDay);
+  const gregMid = hijri.y + hijri.h + 1 + Math.max(gr[1], TIER.xs.h) / 2;
+  const greg = dateRow(`greg_${fx.gregMonth}.png`, gr, fx.gregDay, "xs", 24 + gregW, gregMid);
+  record("gregorian (header)", "header", greg);
+
+  const hrW = measure("xs", fx.hr);
+  record("heart rate", "header", digits("xs", fx.hr, Math.round(PORTHOLE.cx - hrW / 2), PORTHOLE.cy - 8 - 5), { porthole: true });
+  const stepsTier = fx.steps.length > 4 ? "xs" : "md";
+  const sw = measure(stepsTier, fx.steps);
+  record("steps (porthole)", "header", digits(stepsTier, fx.steps, Math.round(PORTHOLE.cx - sw / 2), PORTHOLE.cy + 8 - TIER[stepsTier].h / 2), { porthole: true });
+
+  const rule = document.createElement("div");
+  rule.className = "rule";
+  rule.style.left = "20px";
+  rule.style.top = "80px";
+  rule.style.width = "136px";
+  face.appendChild(rule);
+  record("separator rule", "divider", { x: 20, y: 80, w: 136, h: 1 });
+
+  record("HH:MM", "time", hhmm(fx.hour, fx.min, 88, 94));
+
+  const tempStr = "m*" + fx.temp;
+  const tw = measure("md", tempStr);
+  const [sL, sR] = spanAt(148);
+  const leftCx = Math.round(sL + (88 - sL) / 2);
+  const rightCx = Math.round(88 + (sR - 88) / 2);
+  record("temperature", "shelf", digits("md", tempStr, leftCx - tw / 2, 146));
+  const bb = String(fx.bb);
+  const bw = measure("md", bb);
+  record("body battery", "shelf", digits("md", bb, rightCx - bw / 2, 146));
+  record("battery gauge", "shelf", gauge(Math.max(42, sL + 8), 162, Math.min(92, sR - sL - 16), 4, fx.bat));
+}
+
+function layoutC(fx) {
+  const cx = 88 - 26;
+  const rowH = 37, gap = 4, cy = 59;
+  const hourY = cy - (rowH * 2 + gap) / 2;
+  digits("digit", fx.hour, cx - measure("digit", fx.hour) / 2, hourY);
+  digits("digit", fx.min,  cx - measure("digit", fx.min) / 2, hourY + rowH + gap);
+  record("stacked HH", "time", { x: cx - 30, y: hourY, w: 62, h: 37 });
+  record("stacked MM", "time", { x: cx - 30, y: hourY + rowH + gap, w: 62, h: 37 });
+
+  const hrW = measure("xs", fx.hr);
+  record("heart rate", "header", digits("xs", fx.hr, Math.round(PORTHOLE.cx - hrW / 2), PORTHOLE.cy - 8 - 5), { porthole: true });
+  const stepsTier = fx.steps.length > 4 ? "xs" : "md";
+  const sw = measure(stepsTier, fx.steps);
+  record("steps", "header", digits(stepsTier, fx.steps, Math.round(PORTHOLE.cx - sw / 2), PORTHOLE.cy + 8 - TIER[stepsTier].h / 2), { porthole: true });
+
+  const tempStr = "m*" + fx.temp;
+  const tw = measure("md", tempStr);
+  record("temperature", "time", digits("md", tempStr, Math.round(PORTHOLE.cx - tw / 2), 92 - 6));
+
+  const dow = DOW[fx.dow];
+  img(`dow_${fx.dow}.png`, Math.round(88 - dow[0] / 2), 113 - Math.round(dow[1] / 2), dow[0], dow[1]);
+  record("weekday", "time", { x: Math.round(88 - dow[0] / 2), y: 113 - Math.round(dow[1] / 2), w: dow[0], h: dow[1] });
+
+  const hj = HIJRI[fx.hijriMonth];
+  const gr = GREG[fx.gregMonth];
+  const hijriW = hj[0] + 6 + measure("sm", fx.hijriDay);
+  const gregW  = gr[0] + 6 + measure("xs", fx.gregDay);
+  const blockW = Math.max(hijriW, gregW);
+  let seam = 88 + blockW / 2;
+  if (seam > 144) seam = 144;
+  record("hijri date", "shelf", dateRow(`hijri_${fx.hijriMonth}.png`, hj, fx.hijriDay, "sm", Math.round(seam), 137));
+  record("gregorian", "shelf", dateRow(`greg_${fx.gregMonth}.png`, gr, fx.gregDay, "xs", Math.round(seam), 158));
+
+  record("body battery bar", "header", { x: 6, y: 38, w: 4, h: 100 });
+  const bbBar = document.createElement("div");
+  bbBar.className = "gauge";
+  bbBar.style.left = "6px";
+  bbBar.style.top = "38px";
+  bbBar.style.width = "4px";
+  bbBar.style.height = "100px";
+  const fill = document.createElement("b");
+  fill.style.width = "2px";
+  fill.style.height = Math.max(5, Math.round(98 * fx.bb / 100)) + "px";
+  fill.style.position = "absolute";
+  fill.style.bottom = "1px";
+  fill.style.left = "1px";
+  bbBar.appendChild(fill);
+  face.appendChild(bbBar);
+
+  record("battery gauge", "shelf", gauge(42, 170, 92, 4, fx.bat));
+}
+
+function sampleBox(box, fn) {
+  const hits = [];
+  const pts = [];
+  for (let i = 0; i <= 4; i++) {
+    for (let j = 0; j <= 4; j++) {
+      const x = box.x + (box.w - 1) * i / 4;
+      const y = box.y + (box.h - 1) * j / 4;
+      pts.push([x, y]);
+    }
+  }
+  pts.forEach(([x, y]) => { if (fn(x, y)) hits.push([x, y]); });
+  return hits;
+}
+
+function aabb(a, b) {
+  return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+}
+
+function diagnose(variant) {
+  const checks = [];
+  const zoneMap = Object.fromEntries(ZONES.map(z => [z.id, z]));
+
+  els.forEach(el => {
+    const octHits = sampleBox(el.box, (x, y) => !inOctagon(x, y));
+    if (octHits.length) {
+      checks.push({ lvl: "bad", text: `${el.name} clips the chamfer / panel (${octHits.length}/25 samples off-panel).` });
+      hatch(el.box);
+    }
+    if (!el.porthole) {
+      const ph = sampleBox(el.box, inPorthole);
+      if (ph.length) {
+        checks.push({ lvl: "bad", text: `${el.name} collides with the porthole circle (${ph.length}/25 samples).` });
+        hatch(el.box);
+      }
+    }
+    const z = zoneMap[el.zone];
+    if (z && variant !== "C") {
+      const topOK = el.box.y >= z.y0 - 1;
+      const botOK = el.box.y + el.box.h <= z.y1 + 1;
+      if (!topOK || !botOK) {
+        const overflow = [];
+        if (!topOK) overflow.push(`${(z.y0 - el.box.y).toFixed(0)}px above y=${z.y0}`);
+        if (!botOK) overflow.push(`${(el.box.y + el.box.h - z.y1).toFixed(0)}px below y=${z.y1}`);
+        const gutters = (el.box.y >= z.y0 - 6 && el.box.y + el.box.h <= z.y1 + 6);
+        checks.push({
+          lvl: gutters ? "warn" : "bad",
+          text: `${el.name} is assigned ${z.name} (${z.y0}–${z.y1}) but occupies y=${el.box.y}…${el.box.y + el.box.h} (${overflow.join(", ")}).`,
+        });
+      }
+    }
+  });
+
+  for (let i = 0; i < els.length; i++) {
+    for (let j = i + 1; j < els.length; j++) {
+      const a = els[i], b = els[j];
+      if (aabb(a.box, b.box)) {
+        checks.push({ lvl: "bad", text: `${a.name} overlaps ${b.name}.` });
+        hatch(a.box);
+        hatch(b.box);
+      }
+    }
+  }
+
+  if (variant === "A" || variant === "B") {
+    const time = els.find(e => e.name === "HH:MM");
+    if (time) {
+      const [L, R] = spanAt(time.box.y + time.box.h / 2);
+      const margin = Math.min(time.box.x - L, R - (time.box.x + time.box.w));
+      checks.push({
+        lvl: margin >= 8 ? "ok" : "warn",
+        text: `HH:MM is ${time.box.w}px at the equator; ${Math.round(margin)}px side margin to the panel edge.`,
+      });
+    }
+  }
+
+  const headerGreg = els.find(e => e.name === "gregorian date");
+  if (headerGreg && variant === "A") {
+    const room = PORTHOLE.x - 24;
+    checks.push({
+      lvl: headerGreg.box.w <= room ? "ok" : "bad",
+      text: `Header left column is ~${room}px (x=24 to porthole box). Gregorian row is ${headerGreg.box.w}px.`,
+    });
+  }
+  const headerHijri = els.find(e => e.name === "hijri date");
+  if (headerHijri && variant === "B") {
+    const room = PORTHOLE.x - 24;
+    checks.push({
+      lvl: headerHijri.box.w <= room ? "ok" : "bad",
+      text: `Header left column is ~${room}px (x=24 to porthole box). Hijri row is ${headerHijri.box.w}px.`,
+    });
+  }
+
+  const div = els.find(e => e.zone === "divider" && e.name !== "separator rule");
+  if (div) {
+    const band = 10;
+    checks.push({
+      lvl: div.box.h <= band ? "ok" : "warn",
+      text: `Divider band is 10px; ${div.name} glyph box is ${div.box.h}px. Gutters y=70–75 and 85–90 are 5px each.`,
+    });
+  }
+
+  if (variant === "C") {
+    checks.unshift({
+      lvl: "ok",
+      text: "C is the shipping stacked face. Zone membership is not scored — the overlay is only a comparison.",
+    });
+  }
+  if (!checks.some(c => c.lvl === "bad" || c.lvl === "warn")) {
+    checks.push({ lvl: "ok", text: "No chamfer, porthole, overlap, or zone overflows in this fixture." });
+  }
+
+  const ul = document.getElementById("checks");
+  ul.innerHTML = "";
+  checks.forEach(c => {
+    const li = document.createElement("li");
+    li.className = c.lvl;
+    li.textContent = c.text;
+    ul.appendChild(li);
+  });
+}
+
+function hatch(box) {
+  if (!document.getElementById("showHits").checked) return;
+  const d = document.createElement("div");
+  d.className = "box";
+  d.style.left = box.x + "px";
+  d.style.top = box.y + "px";
+  d.style.width = box.w + "px";
+  d.style.height = box.h + "px";
+  ghost.appendChild(d);
+}
+
+function fillTables(variant) {
+  const budget = document.getElementById("budget");
+  budget.innerHTML = `<tr><th>Zone</th><th>Span</th><th>h</th><th>What this variant puts here</th></tr>`;
+  const byZone = {};
+  els.forEach(e => {
+    (byZone[e.zone] || (byZone[e.zone] = [])).push(e.name);
+  });
+  ZONES.forEach(z => {
+    const items = byZone[z.id] || [];
+    const maxH = items.length ? Math.max(...els.filter(e => e.zone === z.id).map(e => e.box.h)) : 0;
+    const cls = maxH > (z.y1 - z.y0) ? "warn" : "ok";
+    budget.innerHTML += `<tr><td>${z.name}</td><td>y=${z.y0}…${z.y1}</td><td class="${cls}">${z.y1 - z.y0}px band${maxH ? ` / tallest ${maxH}px` : ""}</td><td>${items.join(" · ") || "—"}</td></tr>`;
+  });
+
+  const t = document.getElementById("els");
+  t.innerHTML = `<tr><th>Element</th><th>Box</th><th>Zone</th></tr>`;
+  els.forEach(e => {
+    t.innerHTML += `<tr><td>${e.name}</td><td>x=${e.box.x} y=${e.box.y} ${e.box.w}×${e.box.h}</td><td>${e.zone}</td></tr>`;
+  });
+}
+
+function drawRuler() {
+  const r = document.getElementById("ruler");
+  r.innerHTML = "";
+  const marks = [0, 15, 70, 75, 85, 90, 135, 140, 168, 175];
+  marks.forEach(y => {
+    const i = document.createElement("i");
+    i.textContent = y;
+    i.style.top = (y * 3) + "px";
+    if ([15, 75, 90, 140].includes(y)) i.className = "zone";
+    r.appendChild(i);
+  });
+}
+
+function render() {
+  const { variant, fixture } = params();
+  const v = VARIANTS.find(x => x.key === variant) || VARIANTS[0];
+  const fx = FIXTURES[fixture] || FIXTURES.typical;
+  els.length = 0;
+  face.innerHTML = "";
+  ghost.innerHTML = "";
+  zonesEl.innerHTML = "";
+  if (document.getElementById("showZones").checked) {
+    ZONES.forEach(z => {
+      const d = document.createElement("div");
+      d.className = "zone " + z.color;
+      zonesEl.appendChild(d);
+    });
+  }
+  document.getElementById("variantLabel").textContent = `${v.key} — ${v.name}`;
+  document.getElementById("fixture").value = fixture in FIXTURES ? fixture : "typical";
+  if (v.key === "A") layoutA(fx);
+  else if (v.key === "B") layoutB(fx);
+  else layoutC(fx);
+  diagnose(v.key);
+  fillTables(v.key);
+}
+
+function cycle(dir) {
+  const { variant, fixture } = params();
+  const i = VARIANTS.findIndex(v => v.key === variant);
+  const next = VARIANTS[(i + dir + VARIANTS.length) % VARIANTS.length];
+  setParams({ variant: next.key, fixture });
+  render();
+}
+
+drawRuler();
+document.getElementById("prev").onclick = () => cycle(-1);
+document.getElementById("next").onclick = () => cycle(1);
+document.getElementById("showZones").onchange = render;
+document.getElementById("showHits").onchange = render;
+document.getElementById("fixture").onchange = (e) => {
+  const { variant } = params();
+  setParams({ variant, fixture: e.target.value });
+  render();
+};
+document.addEventListener("keydown", (e) => {
+  const t = e.target;
+  if (t && (t.tagName === "INPUT" || t.tagName === "SELECT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+  if (e.key === "ArrowLeft") cycle(-1);
+  if (e.key === "ArrowRight") cycle(1);
+});
+render();
+</script>
+</body>
+</html>

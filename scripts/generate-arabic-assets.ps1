@@ -1,36 +1,42 @@
-# Renders Noto Kufi Arabic Bold to 1-bit PNG sprites for Connect IQ MIP.
-#
-# Four TABULAR digit tiers - every glyph in a tier shares one cell width, so a
-# multi-digit string never changes width as its value changes:
-#   digit_ 30x37  clock      sm_ 14x17  Hijri day
-#   md_    11x13  steps,     xs_  9x11  heart rate, Gregorian day, 5-digit steps
-#                 temperature (md_ also carries minus / degree / meem)
-# Plus Hijri and Gregorian month names and weekdays. Gregorian renders ~12%%
-# smaller than Hijri. Cell sizes are derived from the widest ink actually
-# rendered, never hardcoded. Dark (white ink) and light (black ink).
+﻿# Renders Connect IQ 1-bit MIP PNG sprites:
+#   Arabic (Noto Kufi Arabic Bold):
+#     sm_    14x17  Hijri day (Eastern Arabic)
+#     hijri_        Hijri month names
+#     dow_          Arabic weekday names
+#   Western / English (Source Code Pro Bold):
+#     digit_ 27x34  inline clock
+#     md_    11x13  shelf metrics, temperature (+ minus / degree / C / F)
+#     xs_    10x11  Gregorian day, 5-digit steps
+#     greg_         English 3-letter Gregorian months (JAN..DEC)
+# Cell sizes are derived from the widest ink actually rendered, never hardcoded.
+# Dark (white ink) and light (black ink).
 Add-Type -AssemblyName System.Drawing
 
 $ErrorActionPreference = "Stop"
-$fontPath = Join-Path $PSScriptRoot "fonts\NotoKufiArabic-Bold.ttf"
-$outDir   = Join-Path $PSScriptRoot "..\resources\images"
+$arFontPath = Join-Path $PSScriptRoot "fonts\NotoKufiArabic-Bold.ttf"
+$enFontPath = Join-Path $PSScriptRoot "fonts\SourceCodePro-Bold.ttf"
+$outDir     = Join-Path $PSScriptRoot "..\resources\images"
 
-if (-not (Test-Path $fontPath)) {
-    Write-Error "Missing font: $fontPath"
-    exit 1
+foreach ($fp in @($arFontPath, $enFontPath)) {
+    if (-not (Test-Path $fp)) {
+        Write-Error "Missing font: $fp"
+        exit 1
+    }
 }
 New-Item -ItemType Directory -Force -Path $outDir | Out-Null
 
 $pfc = New-Object System.Drawing.Text.PrivateFontCollection
-$pfc.AddFontFile($fontPath)
-$family = $pfc.Families[0]
-$style  = [System.Drawing.FontStyle]::Bold
+$pfc.AddFontFile($arFontPath)
+$pfc.AddFontFile($enFontPath)
+$arFamily = $pfc.Families | Where-Object { $_.Name -like "*Noto*" } | Select-Object -First 1
+$enFamily = $pfc.Families | Where-Object { $_.Name -like "*Source Code*" } | Select-Object -First 1
 $clear  = [System.Drawing.Color]::FromArgb(0, 0, 0, 0)
 
 function FromCp([int[]]$cp) {
     -join ($cp | ForEach-Object { [char]$_ })
 }
 
-function New-Font([float]$px) {
+function New-Font($family, [float]$px, $style) {
     return New-Object System.Drawing.Font($family, $px, $style, [System.Drawing.GraphicsUnit]::Pixel)
 }
 
@@ -125,8 +131,8 @@ function Fit-ToCell($bmp, [int]$cellW, [int]$cellH, $ink) {
     return $dst
 }
 
-function Render-Text([string]$text, [float]$px, $ink, [bool]$rtl, [int]$canvasW, [int]$canvasH) {
-    $font = New-Font $px
+function Render-Text([string]$text, $family, [float]$px, $style, $ink, [bool]$rtl, [int]$canvasW, [int]$canvasH) {
+    $font = New-Font $family $px $style
     $bmp = New-Object System.Drawing.Bitmap $canvasW, $canvasH, ([System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
     $g = [System.Drawing.Graphics]::FromImage($bmp)
     $g.Clear($clear)
@@ -146,10 +152,10 @@ function Render-Text([string]$text, [float]$px, $ink, [bool]$rtl, [int]$canvasW,
     return $bmp
 }
 
-function Find-SizeForHeight([string]$probe, [int]$wantH, [bool]$rtl, $ink, [int]$cw, [int]$ch, [float]$lo, [float]$hi) {
+function Find-SizeForHeight([string]$probe, $family, $style, [int]$wantH, [bool]$rtl, $ink, [int]$cw, [int]$ch, [float]$lo, [float]$hi) {
     $best = $lo
     for ($s = $hi; $s -ge $lo; $s -= 1.0) {
-        $bmp = Render-Text $probe $s $ink $rtl $cw $ch
+        $bmp = Render-Text $probe $family $s $style $ink $rtl $cw $ch
         Binarize-Bitmap $bmp $ink
         $b = Get-InkBounds $bmp
         $bmp.Dispose()
@@ -189,6 +195,7 @@ function Save-Bmp($bmp, [string]$name) {
 }
 
 $AR = 0x0660..0x0669 | ForEach-Object { [char]$_ }
+$EN = 0..9 | ForEach-Object { $_.ToString() }
 $hijri = @(
     (FromCp @(0x0645,0x062D,0x0631,0x0645)),
     (FromCp @(0x0635,0x0641,0x0631)),
@@ -203,20 +210,7 @@ $hijri = @(
     (FromCp @(0x0630,0x0648,0x0020,0x0627,0x0644,0x0642,0x0639,0x062F,0x0629)),
     (FromCp @(0x0630,0x0648,0x0020,0x0627,0x0644,0x062D,0x062C,0x0629))
 )
-$greg = @(
-    (FromCp @(0x064A,0x0646,0x0627,0x064A,0x0631)),
-    (FromCp @(0x0641,0x0628,0x0631,0x0627,0x064A,0x0631)),
-    (FromCp @(0x0645,0x0627,0x0631,0x0633)),
-    (FromCp @(0x0623,0x0628,0x0631,0x064A,0x0644)),
-    (FromCp @(0x0645,0x0627,0x064A,0x0648)),
-    (FromCp @(0x064A,0x0648,0x0646,0x064A,0x0648)),
-    (FromCp @(0x064A,0x0648,0x0644,0x064A,0x0648)),
-    (FromCp @(0x0623,0x063A,0x0633,0x0637,0x0633)),
-    (FromCp @(0x0633,0x0628,0x062A,0x0645,0x0628,0x0631)),
-    (FromCp @(0x0623,0x0643,0x062A,0x0648,0x0628,0x0631)),
-    (FromCp @(0x0646,0x0648,0x0641,0x0645,0x0628,0x0631)),
-    (FromCp @(0x062F,0x064A,0x0633,0x0645,0x0628,0x0631))
-)
+$greg = @("JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC")
 $dow = @(
     (FromCp @(0x0627,0x0644,0x0623,0x062D,0x062F)),
     (FromCp @(0x0627,0x0644,0x0627,0x062B,0x0646,0x064A,0x0646)),
@@ -226,16 +220,15 @@ $dow = @(
     (FromCp @(0x0627,0x0644,0x062C,0x0645,0x0639,0x0629)),
     (FromCp @(0x0627,0x0644,0x0633,0x0628,0x062A))
 )
-$meem  = (FromCp @(0x0645))
 $minus = "-"
 
 # Widest and tallest ink across 0-9 at a given font size. Measurement only - reads
 # alpha directly rather than binarizing, so the size search stays cheap.
-function Measure-DigitInk([float]$px, $ink, [int]$cw, [int]$ch) {
+function Measure-DigitInk($digits, $family, [float]$px, $style, $ink, [int]$cw, [int]$ch) {
     $maxW = 0
     $maxH = 0
     for ($d = 0; $d -le 9; $d++) {
-        $raw = Render-Text $AR[$d].ToString() $px $ink $false $cw $ch
+        $raw = Render-Text $digits[$d].ToString() $family $px $style $ink $false $cw $ch
         $b = Get-InkBounds $raw
         $raw.Dispose()
         if ($null -eq $b) { continue }
@@ -247,31 +240,28 @@ function Measure-DigitInk([float]$px, $ink, [int]$cw, [int]$ch) {
     return @{ W = $maxW; H = $maxH }
 }
 
-# Emits one tabular digit set at an exact target cell height. The font size is
-# searched for (largest size whose tallest digit still fits), then the cell width is
-# derived from the widest ink actually rendered - never hardcoded, so swapping the
-# font or changing a target height stays correct.
+# Emits one tabular digit set at an exact target cell height.
 function Emit-TabularDigits(
-    [string]$prefix, [int]$targetCellH, $ink, [string]$sfx,
+    [string]$prefix, $digits, $family, $style, [int]$targetCellH, $ink, [string]$sfx,
     [int]$cw, [int]$ch, [float]$lo, [float]$hi
 ) {
     $wantInk = $targetCellH - 2
     $px = $lo
     $m  = $null
     for ($s = $hi; $s -ge $lo; $s -= 0.5) {
-        $probe = Measure-DigitInk $s $ink $cw $ch
+        $probe = Measure-DigitInk $digits $family $s $style $ink $cw $ch
         if ($probe.H -gt 0 -and $probe.H -le $wantInk) { $px = $s; $m = $probe; break }
     }
     if ($null -eq $m) {
         $px = $lo
-        $m  = Measure-DigitInk $px $ink $cw $ch
+        $m  = Measure-DigitInk $digits $family $px $style $ink $cw $ch
     }
     $cellW = $m.W + 2
     $cellH = $targetCellH
     Write-Host ("  {0}*  font {1}px  cell {2}x{3}  (widest ink {4}px, tallest {5}px)" -f `
         $prefix, $px, $cellW, $cellH, $m.W, $m.H)
     for ($d = 0; $d -le 9; $d++) {
-        $raw  = Render-Text $AR[$d].ToString() $px $ink $false $cw $ch
+        $raw  = Render-Text $digits[$d].ToString() $family $px $style $ink $false $cw $ch
         $cell = Fit-ToCell $raw $cellW $cellH $ink
         Save-Bmp $cell ("{0}{1}{2}.png" -f $prefix, $d, $sfx)
         $cell.Dispose()
@@ -280,7 +270,8 @@ function Emit-TabularDigits(
 }
 $longestMonth = $hijri[5]
 $longestDow   = $dow[3]
-$tallDigit    = $AR[8].ToString()
+$arBold       = [System.Drawing.FontStyle]::Bold
+$enReg        = [System.Drawing.FontStyle]::Regular
 
 foreach ($variant in @(
     @{ Ink = [System.Drawing.Color]::White; Suffix = "" },
@@ -291,59 +282,56 @@ foreach ($variant in @(
     Write-Host "=== variant '$sfx' ==="
 
     # ── Tabular digit tiers ──────────────────────────────────────────────────
-    #   digit_ : stacked HH/MM clock          sm_ : Hijri day
-    #   md_    : porthole steps, temperature  xs_ : porthole HR, Gregorian day
-    # Clock and sm_ keep the cell heights they have today (37 / 17); md_ and xs_ are
-    # new, sized so the porthole's worst-case content clears the circle.
-    $clock = Emit-TabularDigits "digit_" 37 $ink $sfx 96 96 28 64
-    $sm    = Emit-TabularDigits "sm_"    17 $ink $sfx 48 40  9 24
-    $md    = Emit-TabularDigits "md_"    13 $ink $sfx 40 32  6 20
-    $xs    = Emit-TabularDigits "xs_"    11 $ink $sfx 32 28  5 18
+    #   digit_ : Western inline HH:MM clock    sm_ : Eastern Arabic Hijri day
+    #   md_    : Western shelf + temperature   xs_ : Western Gregorian day, 5-digit steps
+    $clock = Emit-TabularDigits "digit_" $EN $enFamily $enReg  34 $ink $sfx 80 80 24 64
+    $sm    = Emit-TabularDigits "sm_"    $AR $arFamily $arBold 17 $ink $sfx 48 40  9 24
+    $md    = Emit-TabularDigits "md_"    $EN $enFamily $enReg  13 $ink $sfx 40 32  6 20
+    $xs    = Emit-TabularDigits "xs_"    $EN $enFamily $enReg  11 $ink $sfx 32 28  5 18
 
     # md_ also carries the temperature sign and unit. These stay proportional -
     # only digits need a uniform advance.
     $mdH  = $md.CellH
     $mdPx = $md.Px
-    Save-Bmp (Crop-ToInk (Render-Text $minus $mdPx $ink $false 40 32) 1 1 $mdH $ink) ("md_minus{0}.png" -f $sfx)
-    Save-Bmp (Crop-ToInk (Render-Text $meem  $mdPx $ink $true  40 32) 1 1 $mdH $ink) ("md_meem{0}.png"  -f $sfx)
+    Save-Bmp (Crop-ToInk (Render-Text $minus $enFamily $mdPx $enReg $ink $false 40 32) 1 1 $mdH $ink) ("md_minus{0}.png" -f $sfx)
+    Save-Bmp (Crop-ToInk (Render-Text "C"    $enFamily $mdPx $enReg $ink $false 40 32) 1 1 $mdH $ink) ("md_c{0}.png"     -f $sfx)
+    Save-Bmp (Crop-ToInk (Render-Text "F"    $enFamily $mdPx $enReg $ink $false 40 32) 1 1 $mdH $ink) ("md_f{0}.png"     -f $sfx)
 
     $deg = New-DegreeBitmap $mdH $ink 4
     Save-Bmp $deg ("md_degree{0}.png" -f $sfx)
     $deg.Dispose()
 
-    $monthPx = Find-SizeForHeight $longestMonth 16 $true $ink 240 56 10 24
-    Write-Host "Month font ${monthPx}px"
+    $monthPx = Find-SizeForHeight $longestMonth $arFamily $arBold 16 $true $ink 240 56 10 24
+    Write-Host "Hijri month font ${monthPx}px"
     for ($i = 0; $i -lt 12; $i++) {
-        $raw = Render-Text $hijri[$i] $monthPx $ink $true 240 56
+        $raw = Render-Text $hijri[$i] $arFamily $monthPx $arBold $ink $true 240 56
         $cropped = Crop-ToInk $raw 1 1 0 $ink
         if ($cropped.Width -gt 130) {
             $cropped.Dispose()
-            $raw2 = Render-Text $hijri[$i] ($monthPx - 2) $ink $true 240 56
+            $raw2 = Render-Text $hijri[$i] $arFamily ($monthPx - 2) $arBold $ink $true 240 56
             $cropped = Crop-ToInk $raw2 1 1 0 $ink
         }
         Save-Bmp $cropped ("hijri_{0}{1}.png" -f ($i + 1), $sfx)
         $cropped.Dispose()
     }
-    # Gregorian is the secondary calendar: render it ~12% smaller than Hijri so the
-    # two rows read as a hierarchy, and so the stack regains the vertical room the
-    # increased leading needs.
-    $gregPx = [Math]::Max(8.0, [Math]::Round($monthPx * 0.88, 1))
+
+    $gregPx = $xs.Px
     Write-Host "Gregorian month font ${gregPx}px (Hijri ${monthPx}px)"
     for ($i = 0; $i -lt 12; $i++) {
-        $raw = Render-Text $greg[$i] $gregPx $ink $true 240 56
-        $cropped = Crop-ToInk $raw 1 1 0 $ink
+        $raw = Render-Text $greg[$i] $enFamily $gregPx $enReg $ink $false 80 40
+        $cropped = Crop-ToInk $raw 1 1 $xs.CellH $ink
         Save-Bmp $cropped ("greg_{0}{1}.png" -f ($i + 1), $sfx)
         $cropped.Dispose()
     }
 
-    $dowPx = Find-SizeForHeight $longestDow 20 $true $ink 240 64 12 28
+    $dowPx = Find-SizeForHeight $longestDow $arFamily $arBold 20 $true $ink 240 64 12 28
     Write-Host "Weekday font ${dowPx}px"
     for ($i = 0; $i -lt 7; $i++) {
-        $raw = Render-Text $dow[$i] $dowPx $ink $true 240 64
+        $raw = Render-Text $dow[$i] $arFamily $dowPx $arBold $ink $true 240 64
         $cropped = Crop-ToInk $raw 1 1 0 $ink
         Save-Bmp $cropped ("dow_{0}{1}.png" -f ($i + 1), $sfx)
         $cropped.Dispose()
     }
 }
 
-Write-Host "Done - Arabic sprites in $outDir"
+Write-Host "Done - sprites in $outDir"

@@ -1,80 +1,79 @@
-# Instinct 3 Solar Arabic watch face (gi3s)
+# My Watch Face for Garmin Instinct 3 Solar 45mm
 
-An Arabic-only Connect IQ watch face for the **Garmin Instinct 3 Solar 45mm**: stacked Noto Kufi Arabic-Indic time, dual calendar (Hijri + Gregorian) without years, weekday, temperature in م°, and an activity porthole.
+An Arabic/English hybrid Connect IQ watch face for the **Garmin Instinct 3 Solar 45mm**: single-row Western `HH:MM` time, pure Arabic weekday and Hijri date (with Eastern-Arabic day numerals), English Gregorian date, temperature in `°C`/`°F` + 1-bit weather icon in the porthole, and Steps / Heart Rate / Body Battery on the bottom shelf.
 
 > **Note:** Source is intentionally monolithic in a single `MyWatchFace.mc` file for easy sharing and review.
-
-Garmin `developer_key.pem` / `.der` stay local (gitignored). Never force-add them.
 
 ## Layout
 
 ```
 ┌─────────────────────────────────────┐
-│                         ╭─  ٩٠  ─╮ │
-│ ▌ ١٩                    │ ٧٤٣٦  │ │
-│ ▌ ١٨                    م°٢٧     │
-│ ▌                                   │
-│ ▌          الخميس                   │
-│ ▌       ربيع الأول  ١٤              │
-│ ▌          أغسطس  ٢٧                │
-│         ▓▓▓▓▓▓░░░░░░░               │ battery
+│  [Arabic Weekday]       ╭───────╮   │
+│                         │ (cld) │   │
+│  NOV 23                 │ 54°F  │   │
+│                         ╰───────╯   │
+│     [Arabic Hijri Month]  13        │
+│                09:20                │
+│     [steps]    [hr]      [bb]       │
+│       0         80        5         │
+│          [▓▓▓▓▓▓▓▓▓░░░]             │ battery
 └─────────────────────────────────────┘
-   └ body battery
 ```
 
-Porthole legend is position (HR top, steps below). Date rows are month + day, day
-on the right, with both rows sharing one right seam.
+Header is Arabic weekday + English Gregorian (`MMM DD`) on the left, weather + temperature in the
+porthole. Hijri (the long row, Arabic month + Eastern-Arabic day) is centred on the divider so it clears the
+porthole. Time is a single-row `HH:MM` across the equator. The shelf shows Steps, Heart Rate, and Body Battery
+with 1-bit icons above the battery gauge.
+
+Date rows are month + day, day on the right.
 
 The display is a 176×176 **semi-octagon**, not a circle — the corners are rounded
-chamfers, so the usable span narrows sharply top and bottom. Both bars are inset to
+chamfers, so the usable span narrows sharply top and bottom. The top-right corner
+is the hardware porthole, so that chamfer is not cut. The battery bar is inset to
 the panel's actually-visible span rather than drawn edge to edge; drawn full width
-they would be invisible below ~20 % and saturated above ~78 %.
+it would be invisible below 22 % and saturated above 78 %.
 
 ## Features
 
 ### Time
 
-- **Stacked 24 h** — `HH` over `MM` (no colon)
-- **Noto Kufi Arabic-Indic digits** — *tabular* ٠–٩ sprites, dark + light
-- Both rows share one 62 px width, so the hour and minute always align. With
-  proportional sprites (٠–٩ ran 9–30 px) the two independently-centred rows sat up
-  to 21 px apart at times like 11:33.
-- Positioned upper-left toward center (clears the porthole)
+- **Single-row 24 h** — `HH:MM` with a drawn colon (there is no colon sprite)
+- **Source Code Pro Bold digits** — *tabular* `0–9` sprites, dark + light
+- Centred on the wide equator (`27×34 px` cells)
 
 ### Weekday
 
-- Full Arabic name, centered (`الأحد` … `السبت`)
+- Full Arabic name, left-aligned in the header (`الأحد` … `السبت`)
 - Sunrise/sunset are not shown
 
 ### Dates
 
-- **Hijri** — full month name + day (no year)
-- **Gregorian** — `يناير`…`ديسمبر` + day (no year), rendered ~12 % smaller than
-  Hijri so the two calendars read as a hierarchy
-- **Hijri offset** — configurable ±2 days (Settings → Hijri date shift)
-- **Color theme** — dark (default) or light
+- **Gregorian** — English 3-letter month (`JAN`…`DEC`) + Western day (`01`…`31`, no year) in header
+- **Hijri** — full Arabic month name + Eastern-Arabic day (no year), centred on the divider
+- **Hijri offset** — configurable ±2 days (Settings → Hijri date shift). Converted
+  on every redraw so Connect / on-watch changes apply immediately
+
+### Theme
+
+- **Color theme** — dark (default) or light, rendered for the 1-bpp (black/white only) MIP display
 
 ### Temperature
 
-- Unit then number: the logical `°م` reverses in an RTL run, so it paints as `م°`
-  at the left with the number to its right — `م°٢٧`. Centred on the porthole axis.
-- Rounded, not truncated: −0.6 °C reads `-1`
-- A negative keeps its sign with the number as one LTR block: `م°-٤٠`
-- Missing data draws `م°--`
-- Weather condition icons are not shown
+- Western numerals + unit (`15°C` or `59°F` depending on device temperature units), centred in the porthole
+- Rounded, not truncated: −0.6 °C reads `-1°C`
+- Missing data draws `--°C` (or `--°F`)
 
 ### Activity porthole (upper-right)
 
-- **Heart rate** (top, `xs` tier) and **steps** (below, `md` tier), numbers only
-- Steps stay exact at every value: past 9999 the row drops to the `xs` tier so five
-  digits still clear the circle
-- Missing HR draws `--`
+- **Weather** (1-bit primitive: sun, cloud, rain, storm, snow) above **temperature**
 - Geometry comes from `WatchUi.getSubscreen()`, not a hardcoded centre
 
-### Battery bar
+### Bottom shelf
 
-- 4 px bar at the bottom, proportional fill across the visible span (x 40–135)
-- Body Battery bar on the left edge, spanning its visible run (y 36–139)
+- **Steps** (left) — exact at every value; past 9999 the row drops to the `xs` tier
+- **Heart rate** (centre) — bpm from activity history / live activity / sensor history; missing data draws `--`
+- **Body battery** (right) — percent; missing data draws `--`
+- **Battery bar** — 4 px gauge under the metrics (1 px outline track with proportional fill), inset to the visible span
 
 ## Power efficiency
 
@@ -82,7 +81,7 @@ All UI updates run on a **single 60-second timer**.
 
 | Mechanism | Detail |
 |-----------|--------|
-| Minute tick | `Timer` every 60 s; refreshes steps, HR, dates, weather cache, then full redraw |
+| Minute tick | `Timer` every 60 s; refreshes steps, dates, weather cache, then full redraw |
 | Cached weather | `Weather.getCurrentConditions()` at most every 15 min |
 | Cached battery | `System.getSystemStats()` at most every 5 min |
 | No background service | No `Background` permission |
@@ -94,10 +93,10 @@ All UI updates run on a **single 60-second timer**.
 |--------|---------|
 | `Theme` | `colorMode` property, palette, dark/light resource selection |
 | `GlyphSet` | One tabular sprite tier: uniform digit cells, optional symbols |
-| `Glyphs` | The four tiers, plus the stacked-time helper |
+| `Glyphs` | The four tiers, plus the inline-time helper |
 | `ArabicLabels` | Current Hijri month, Gregorian month, and weekday bitmaps |
 | `HijriHelpers` | Tabular Hijri conversion |
-| `TimeHelpers` | Hour/minute formatting for stacked time |
+| `TimeHelpers` | Hour/minute formatting for inline time |
 
 ### Sprite tiers
 
@@ -106,12 +105,12 @@ never hardcoded, so changing the font or a target height stays correct.
 
 | Tier | Cell | Used by |
 |------|------|---------|
-| `digit_` | 30×37 | Stacked clock |
-| `sm_` | 14×17 | Hijri day |
-| `md_` | 11×13 | Steps (≤ 9999), temperature (+ `-`, `°`, `م`) |
-| `xs_` | 9×11 | Heart rate, Gregorian day, steps (≥ 10000) |
+| `digit_` | 27×34 | Inline clock (`0–9`) |
+| `sm_` | 14×17 | Hijri day (`٠–٩`) |
+| `md_` | 11×13 | Steps (≤ 9999), HR, body battery, temperature (`-`, `°`, `C`, `F`) |
+| `xs_` | 10×11 | Gregorian day (`0–9`), steps (≥ 10000) |
 
-Sprites regenerate via [`scripts/generate-arabic-assets.ps1`](scripts/generate-arabic-assets.ps1) from [Noto Kufi Arabic Bold](https://fonts.google.com/noto/specimen/Noto+Kufi+Arabic) (OFL).
+Sprites regenerate via [`scripts/generate-arabic-assets.ps1`](scripts/generate-arabic-assets.ps1) from [Noto Kufi Arabic Bold](https://fonts.google.com/noto/specimen/Noto+Kufi+Arabic) (OFL) and Source Code Pro Bold.
 
 ## Settings
 
@@ -128,7 +127,7 @@ Settings menus stay **English**. Default theme is **dark**.
 |------------|----------|
 | `UserProfile` | User profile data |
 | `positioning` | Weather location |
-| `SensorHistory` | Heart rate history fallback |
+| `SensorHistory` | Body battery history |
 
 ## Building
 
@@ -165,7 +164,3 @@ monkeydo watchface.prg instinct3solar45mm
 ## Screenshot
 
 ![Watch face preview](watchface_preview.png)
-
-## License
-
-MIT — see [LICENSE](LICENSE).
